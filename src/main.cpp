@@ -18,14 +18,14 @@ int main() {
     return 0;
   }
 
-  string prefix="echo";
+  string prefix="echo ";
 
-if(command.rfind("echo",0)==0){
+if(command.rfind(prefix,0)==0){
   cout<<command.substr(prefix.size())<<'\n';
   return 0;
 }
 
-  cout << command << ":command not found" << endl;
+  cout << command <<":command not found"<< endl;
 
 
   main();
