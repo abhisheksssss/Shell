@@ -27,9 +27,12 @@ if(command.rfind(prefix,0)==0){
  string prefix2="type ";
 
 if(command.rfind(prefix2,0)==0){
-  if(command.substr(prefix.size()) =="exit"||command.substr(prefix.size())=="echo" || command.substr(prefix.size())=="type"||command.substr(prefix.size())=="invalid_orange_command"){
+  if(command.substr(prefix.size()) =="exit"||command.substr(prefix.size())=="echo" || command.substr(prefix.size())=="type"){
     cout<<command.substr(prefix.size())<<" is a shell builtin"<< '\n';
     main();
+  }else{
+      cout<<command.substr(prefix.size())<<": not found"<< '\n';
+      main();
   }
 }
 
