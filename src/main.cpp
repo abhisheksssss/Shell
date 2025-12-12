@@ -22,7 +22,7 @@ int main() {
 
 if(command.rfind(prefix,0)==0){
   cout<<command.substr(prefix.size())<< '\n';
-  return 0;
+  main();
 }
 
   cout << command <<":command not found"<< endl;
