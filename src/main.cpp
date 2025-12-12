@@ -24,6 +24,12 @@ if(command.rfind(prefix,0)==0){
   cout<<command.substr(prefix.size())<< '\n';
   main();
 }
+ string prefix2="type";
+
+if(command.rfind(prefix2,0)==0){
+  cout<<command.substr(prefix.size())<<" is a shell builtin"<< '\n';
+  main();
+}
 
   cout << command <<": command not found"<< endl;
 
