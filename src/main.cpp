@@ -25,7 +25,7 @@ if(command.rfind(prefix,0)==0){
   main();
 }
 
-  cout << command <<":command not found"<< endl;
+  cout << command <<": command not found"<< endl;
 
 
   main();
