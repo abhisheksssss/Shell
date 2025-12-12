@@ -21,11 +21,11 @@ int main() {
   string prefix="echo";
 
 if(command.rfind("echo",0)==0){
-  cout<<command.substr(prefix.size())<<endl;
+  cout<<command.substr(prefix.size())<<'\n';
   return 0;
 }
 
-  cout << command << ": command not found" << endl;
+  cout << command << ":command not found" << endl;
 
 
   main();
