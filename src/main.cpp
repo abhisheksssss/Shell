@@ -5,8 +5,6 @@ using namespace std;
 int main() {
   // Flush after every std::cout / std:cerr
   
-  
-  
   cout << unitbuf;
   cerr << unitbuf;
   
@@ -15,6 +13,6 @@ int main() {
 
   string command;
   getline(cin,command);
-  cout<<command<<"Command not founded"<<endl;
-  
+  cout << command << ": command not found" << endl;
+
 }
