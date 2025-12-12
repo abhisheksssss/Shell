@@ -22,10 +22,11 @@ int main() {
 
 if(command.rfind("echo",0)==0){
   cout<<command.substr(prefix.size())<<endl;
-}else
-{
-  cout << command << ": command not found" << endl;
+  return 0;
 }
+
+  cout << command << ": command not found" << endl;
+
 
   main();
 }
