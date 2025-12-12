@@ -21,7 +21,7 @@ int main() {
   string prefix="echo ";
 
 if(command.rfind(prefix,0)==0){
-  cout<<"$ "<<command.substr(prefix.size())<<'\n';
+  cout<<" "<<command.substr(prefix.size())<<'\n';
   return 0;
 }
 
