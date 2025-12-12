@@ -27,7 +27,7 @@ if(command.rfind(prefix,0)==0){
  string prefix2="type ";
 
 if(command.rfind(prefix2,0)==0){
-  if(command.substr(prefix.size()) =="exit"||command.substr(prefix.size())=="echo"){
+  if(command.substr(prefix.size()) =="exit"||command.substr(prefix.size())=="echo" || command.substr(prefix.size())=="type"){
     cout<<command.substr(prefix.size())<<" is a shell builtin"<< '\n';
     main();
   }
