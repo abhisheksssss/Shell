@@ -13,6 +13,10 @@ int main() {
   cout << "$ ";
   string command;
   getline(cin,command);
+
+  if(command=="exit"){
+    main();
+  }
   cout << command << ": command not found" << endl;
   main();
 }
