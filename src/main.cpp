@@ -1,43 +1,81 @@
 #include <iostream>
 #include <string>
+#include <vector>
+#include <cstdlib>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sstream>
+
 using namespace std;
 
+bool is_executable(const string &path) {
+    return access(path.c_str(), X_OK) == 0;
+}
+
+vector<string> split_path(const string &path) {
+    vector<string> dirs;
+    stringstream ss(path);
+    string item;
+    while (getline(ss, item, ':')) {
+        dirs.push_back(item);
+    }
+    return dirs;
+}
+
 int main() {
-  // Flush after every std::cout / std:cerr
-  
-  cout << unitbuf;
-  cerr << unitbuf;
-  
-  // TODO: Uncomment the code below to pass the first stage
- 
-  cout << "$ ";
-  string command;
-  getline(cin,command);
+    cout << unitbuf;
+    cerr << unitbuf;
 
-  if(command=="exit"){
-    return 0;
-  }
+    while (true) {
+        cout << "$ ";
+        string input;
+        getline(cin, input);
 
-  string prefix="echo ";
+        if (input == "exit") {
+            return 0;
+        }
 
-if(command.rfind(prefix,0)==0){
-  cout<<command.substr(prefix.size())<< '\n';
-  main();
-}
- string prefix2="type ";
+        // echo builtin
+        if (input.rfind("echo ", 0) == 0) {
+            cout << input.substr(5) << '\n';
+            continue;
+        }
 
-if(command.rfind(prefix2,0)==0){
-  if(command.substr(prefix.size()) =="exit"||command.substr(prefix.size())=="echo" || command.substr(prefix.size())=="type"){
-    cout<<command.substr(prefix.size())<<" is a shell builtin"<< '\n';
-    main();
-  }else{
-      cout<<command.substr(prefix.size())<<": not found"<< '\n';
-      main();
-  }
-}
+        // type builtin
+        if (input.rfind("type ", 0) == 0) {
+            string cmd = input.substr(5);
 
-  cout << command <<": command not found"<< endl;
+            // Builtins
+            if (cmd == "exit" || cmd == "echo" || cmd == "type") {
+                cout << cmd << " is a shell builtin\n";
+                continue;
+            }
 
+            // Search in PATH
+            char *path_env = getenv("PATH");
+            if (path_env) {
+                vector<string> paths = split_path(path_env);
+                bool found = false;
 
-  main();
+                for (const string &dir : paths) {
+                    string full_path = dir + "/" + cmd;
+                    if (is_executable(full_path)) {
+                        cout << cmd << " is " << full_path << '\n';
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    cout << cmd << ": not found\n";
+                }
+            } else {
+                cout << cmd << ": not found\n";
+            }
+            continue;
+        }
+
+        // Default case
+        cout << input << ": command not found\n";
+    }
 }
