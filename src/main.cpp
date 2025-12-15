@@ -4,8 +4,8 @@
 #include <cstdlib>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <sstream>
 #include <sys/wait.h>
+#include <sstream>
 
 using namespace std;
 
@@ -23,41 +23,42 @@ vector<string> split_path(const string &path) {
     return dirs;
 }
 
-vector<string> split_args(const string &input){
-vector<string> args;
-stringstream ss(input);
-string token;
-while(ss>>token){
-    args.push_back(token);
-}
-return args;
+vector<string> split_args(const string &input) {
+    vector<string> args;
+    stringstream ss(input);
+    string token;
+    while (ss >> token) {
+        args.push_back(token);
+    }
+    return args;
 }
 
-
-vector<char*> to_char_array(vector<string>&args){
+vector<char*> to_char_array(vector<string> &args) {
     vector<char*> result;
-
-    for(auto &arg:args){
+    for (auto &arg : args) {
         result.push_back(const_cast<char*>(arg.c_str()));
     }
     result.push_back(nullptr);
     return result;
 }
 
+void run_external(vector<string> &args) {
+    pid_t pid = fork();
 
-void run_external(vector<string> &args){
- pid_t pid = fork();  
-    if(pid==0){
-        vector<char*> c_args=to_char_array(args);
-          execvp(c_args[0], c_args.data());
+    if (pid == 0) {
+        vector<char*> c_args = to_char_array(args);
+        execvp(c_args[0], c_args.data());
         perror("execvp");
         exit(1);
-    }else if(pid>0){
+    } 
+    else if (pid > 0) {
         wait(nullptr);
-    }else{
+    } 
+    else {
         perror("fork");
     }
 }
+
 int main() {
     cout << unitbuf;
     cerr << unitbuf;
@@ -81,13 +82,11 @@ int main() {
         if (input.rfind("type ", 0) == 0) {
             string cmd = input.substr(5);
 
-            // Builtins
             if (cmd == "exit" || cmd == "echo" || cmd == "type") {
                 cout << cmd << " is a shell builtin\n";
                 continue;
             }
 
-            // Search in PATH
             char *path_env = getenv("PATH");
             if (path_env) {
                 vector<string> paths = split_path(path_env);
@@ -105,21 +104,16 @@ int main() {
                 if (!found) {
                     cout << cmd << ": not found\n";
                 }
-            }else {
-
+            } else {
                 cout << cmd << ": not found\n";
             }
             continue;
         }
 
-        
-
-
-        // Default case
-       vector<string> args = split_args(input);
-if (!args.empty()) {
-    run_external(args);
-}
+        // External command
+        vector<string> args = split_args(input);
+        if (!args.empty()) {
+            run_external(args);
+        }
     }
 }
-
