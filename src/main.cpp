@@ -9,6 +9,8 @@
 
 using namespace std;
 
+/* ---------- Helpers ---------- */
+
 bool is_executable(const string &path) {
     return access(path.c_str(), X_OK) == 0;
 }
@@ -42,14 +44,18 @@ vector<char*> to_char_array(vector<string> &args) {
     return result;
 }
 
+/* ---------- External Command Execution ---------- */
+
 void run_external(vector<string> &args) {
     pid_t pid = fork();
 
     if (pid == 0) {
         vector<char*> c_args = to_char_array(args);
         execvp(c_args[0], c_args.data());
-        perror("execvp");
-        exit(1);
+
+        // execvp failed → command not found
+        cerr << args[0] << ": command not found\n";
+        exit(127);
     } 
     else if (pid > 0) {
         wait(nullptr);
@@ -58,6 +64,8 @@ void run_external(vector<string> &args) {
         perror("fork");
     }
 }
+
+/* ---------- Main Shell Loop ---------- */
 
 int main() {
     cout << unitbuf;
@@ -68,17 +76,20 @@ int main() {
         string input;
         getline(cin, input);
 
+        if (input.empty()) continue;
+
+        /* exit builtin */
         if (input == "exit") {
             return 0;
         }
 
-        // echo builtin
+        /* echo builtin */
         if (input.rfind("echo ", 0) == 0) {
             cout << input.substr(5) << '\n';
             continue;
         }
 
-        // type builtin
+        /* type builtin */
         if (input.rfind("type ", 0) == 0) {
             string cmd = input.substr(5);
 
@@ -88,10 +99,10 @@ int main() {
             }
 
             char *path_env = getenv("PATH");
+            bool found = false;
+
             if (path_env) {
                 vector<string> paths = split_path(path_env);
-                bool found = false;
-
                 for (const string &dir : paths) {
                     string full_path = dir + "/" + cmd;
                     if (is_executable(full_path)) {
@@ -100,17 +111,15 @@ int main() {
                         break;
                     }
                 }
+            }
 
-                if (!found) {
-                    cout << cmd << ": not found\n";
-                }
-            } else {
+            if (!found) {
                 cout << cmd << ": not found\n";
             }
             continue;
         }
 
-        // External command
+        /* external command */
         vector<string> args = split_args(input);
         if (!args.empty()) {
             run_external(args);
