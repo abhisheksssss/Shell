@@ -22,6 +22,39 @@ vector<string> split_path(const string &path) {
     return dirs;
 }
 
+vector<string> split_args(const string &input){
+vector<string> args:
+stringstream ss(input);
+string token;
+while(ss>token){
+    args.push_back(token);
+}
+return args;
+}
+
+
+vector<char*> to_char_array(vector<string>&args){
+    vector<char*> result;
+
+    for(auto &arg:args){
+        result.push_back(&args[0]);
+    }
+    result.push_back(nullptr);
+    return result;
+}
+void run_external(vector<string> &args){
+    pid_t=fork();
+    if(pid==0){
+        vector<char*> c_args=to_char_array(args);
+          execvp(c_args[0], c_args.data());
+        perror("execvp");
+        exit(1);
+    }else if(pid>0){
+        wait(nullptr)
+    }else{
+        perror("fork")
+    }
+}
 int main() {
     cout << unitbuf;
     cerr << unitbuf;
@@ -69,13 +102,21 @@ int main() {
                 if (!found) {
                     cout << cmd << ": not found\n";
                 }
-            } else {
+            }else {
+
                 cout << cmd << ": not found\n";
             }
             continue;
         }
 
+        
+
+
         // Default case
-        cout << input << ": command not found\n";
+       vector<string> args = split_args(input);
+if (!args.empty()) {
+    run_external(args);
+}
     }
 }
+
