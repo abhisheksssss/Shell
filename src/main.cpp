@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sstream>
+#include <sys/wait.h>
 
 using namespace std;
 
@@ -23,10 +24,10 @@ vector<string> split_path(const string &path) {
 }
 
 vector<string> split_args(const string &input){
-vector<string> args:
+vector<string> args;
 stringstream ss(input);
 string token;
-while(ss>token){
+while(ss>>token){
     args.push_back(token);
 }
 return args;
@@ -37,22 +38,24 @@ vector<char*> to_char_array(vector<string>&args){
     vector<char*> result;
 
     for(auto &arg:args){
-        result.push_back(&args[0]);
+        result.push_back(const_cast<char*>(arg.c_str()));
     }
     result.push_back(nullptr);
     return result;
 }
+
+
 void run_external(vector<string> &args){
-    pid_t=fork();
+ pid_t pid = fork();  
     if(pid==0){
         vector<char*> c_args=to_char_array(args);
           execvp(c_args[0], c_args.data());
         perror("execvp");
         exit(1);
     }else if(pid>0){
-        wait(nullptr)
+        wait(nullptr);
     }else{
-        perror("fork")
+        perror("fork");
     }
 }
 int main() {
