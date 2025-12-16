@@ -98,11 +98,11 @@ int main() {
   
 
             if (cmd == "exit" || cmd == "echo" || cmd == "type"||cmd=="pwd") {
-        if(cmd=="pwd"){
-            filesystem::path cwd=filesystem::current_path();
-             cout<<cwd<<endl;
-             continue;
-               }
+        // if(cmd=="pwd"){
+        //     filesystem::path cwd=filesystem::current_path();
+        //      cout<<cwd<<endl;
+        //      continue;
+        //        }
 
                 cout << cmd << " is a shell builtin\n";
                 continue;
