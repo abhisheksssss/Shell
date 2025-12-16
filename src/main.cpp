@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <filesystem>
 #include <sstream>
 
 using namespace std;
@@ -88,6 +89,13 @@ int main() {
             cout << input.substr(5) << '\n';
             continue;
         }
+
+        if (input=="pwd") {
+          filesystem::path cwd=filesystem::current_path();
+          cout<<"current working directory: "<<cwd<<endl;
+          return 0;
+        }
+
 
         /* type builtin */
         if (input.rfind("type ", 0) == 0) {
