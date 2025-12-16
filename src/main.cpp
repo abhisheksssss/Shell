@@ -95,14 +95,15 @@ int main() {
         if (input.rfind("type ", 0) == 0) {
             string cmd = input.substr(5);
 
-    if(cmd=="pwd"){
-          filesystem::path cwd=filesystem::current_path();
-          cout<<cwd<<endl;
-          continue;
-    }
+  
 
+            if (cmd == "exit" || cmd == "echo" || cmd == "type"||cmd=="pwd") {
+        if(cmd=="pwd"){
+            filesystem::path cwd=filesystem::current_path();
+             cout<<cwd<<endl;
+             continue;
+               }
 
-            if (cmd == "exit" || cmd == "echo" || cmd == "type") {
                 cout << cmd << " is a shell builtin\n";
                 continue;
             }
