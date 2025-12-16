@@ -98,7 +98,7 @@ int main() {
     if(cmd=="pwd"){
           filesystem::path cwd=filesystem::current_path();
           cout<<cwd<<endl;
-          return 0
+          continue;
     }
 
 
