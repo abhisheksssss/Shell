@@ -92,8 +92,7 @@ int main() {
 
 
          if(input=="pwd"){
-            filesystem::path cwd=filesystem::current_path();
-             cout<<cwd<<endl;
+          cout << filesystem::current_path().string() << '\n';
              continue;
                }
 
