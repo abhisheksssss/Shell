@@ -10,7 +10,6 @@
 
 using namespace std;
 
-/* ---------- Helpers ---------- */
 
 bool is_executable(const string &path) {
     return access(path.c_str(), X_OK) == 0;
@@ -45,7 +44,6 @@ vector<char*> to_char_array(vector<string> &args) {
     return result;
 }
 
-/* ---------- External Command Execution ---------- */
 
 void run_external(vector<string> &args) {
     pid_t pid = fork();
@@ -54,7 +52,6 @@ void run_external(vector<string> &args) {
         vector<char*> c_args = to_char_array(args);
         execvp(c_args[0], c_args.data());
 
-        // execvp failed → command not found
         cerr << args[0] << ": command not found\n";
         exit(127);
     } 
@@ -66,7 +63,6 @@ void run_external(vector<string> &args) {
     }
 }
 
-/* ---------- Main Shell Loop ---------- */
 
 int main() {
     cout << unitbuf;
@@ -90,22 +86,27 @@ int main() {
             continue;
         }
 
-
          if(input=="pwd"){
           cout << filesystem::current_path().string() << '\n';
              continue;
                }
 
+        if(input.rfind("cd ",0)==0){
+            string path=input.substr(3);
+
+            try{
+                filesystem::current_path(path)
+            }catch(const filesystem::filesystem_error& e){
+                cout<<"cd error"<<e<<"\n";
+            }
+            continue;
+        }
 
         /* type builtin */
         if (input.rfind("type ", 0) == 0) {
             string cmd = input.substr(5);
 
-  
-
             if (cmd == "exit" || cmd == "echo" || cmd == "type"||cmd=="pwd") {
-
-
                 cout << cmd << " is a shell builtin\n";
                 continue;
             }
