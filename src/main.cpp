@@ -97,7 +97,7 @@ int main() {
             try{
                 filesystem::current_path(path)
             }catch(const filesystem::filesystem_error& e){
-                cout<<"cd error"<<e<<"\n";
+                cout<<"cd error"<<e.what()<<"\n";
             }
             continue;
         }
