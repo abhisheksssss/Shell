@@ -95,9 +95,9 @@ int main() {
             string path=input.substr(3);
 
             try{
-                filesystem::current_path(path)
+                filesystem::current_path(path);
             }catch(const filesystem::filesystem_error& e){
-                cout<<"cd error"<<e.what()<<"\n";
+                cout<<"cd: "<<path<<": "<<e.what()<<"\n";
             }
             continue;
         }
