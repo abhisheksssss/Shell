@@ -64,8 +64,8 @@ void run_external(vector<string> &args) {
 }
 
 
-string removeQuotes(const string&s){
-  if (s.size() >= 2) {
+string removeQuotes(const string& s) {
+    if (s.size() >= 2) {
         if ((s.front() == '"'  && s.back() == '"') ||
             (s.front() == '\'' && s.back() == '\'')) {
             return s.substr(1, s.size() - 2);
@@ -92,18 +92,11 @@ int main() {
         }
 
         /* echo builtin */
-        if (input.rfind("echo ", 0) == 0) {
-             
-       string msg = input.substr(5);
-
-if (msg.front()=='\'' && msg.back()=="\'") {
+      if (input.rfind("echo ", 0) == 0) {
+    string msg = input.substr(5);
     cout << removeQuotes(msg) << '\n';
     continue;
 }
-
-            cout << input.substr(5) << '\n';
-            continue;
-        }
 
          if(input=="pwd"){
           cout << filesystem::current_path().string() << '\n';
