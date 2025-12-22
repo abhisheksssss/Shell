@@ -65,8 +65,11 @@ void run_external(vector<string> &args) {
 
 
 string removeQuotes(const string&s){
-    if(s.size()>=2 && s.front()=="'" && s.back()=="'"){
-        return s.substr(1,s.size()-2);
+  if (s.size() >= 2) {
+        if ((s.front() == '"'  && s.back() == '"') ||
+            (s.front() == '\'' && s.back() == '\'')) {
+            return s.substr(1, s.size() - 2);
+        }
     }
     return s;
 }
@@ -93,7 +96,7 @@ int main() {
              
        string msg = input.substr(5);
 
-if (msg.starts_with("'") && msg.ends_with("'")) {
+if (msg.front()=='\'' && msg.back()=="\'") {
     cout << removeQuotes(msg) << '\n';
     continue;
 }
