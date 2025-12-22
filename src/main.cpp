@@ -63,6 +63,15 @@ void run_external(vector<string> &args) {
     }
 }
 
+string normalizeSpaces(const string& s){
+    stringstream ss(s);
+    string word,result;
+    while(ss>>word){
+        if(!result.empty())result += " ";
+        result += word;
+    }
+    return result; 
+}
 
 string removeQuotes(const string& s) {
     if (s.size() >= 2) {
@@ -91,20 +100,21 @@ int main() {
             return 0;
         }
 
-        /* echo builtin */
-        if (input.rfind("echo ", 0) == 0) {
-             
-       string msg = input.substr(5);
+       /* echo builtin */
+if (input.rfind("echo ", 0) == 0) {
+    string msg = input.substr(5);
 
-   if (msg.front()=='\'' && msg.back()=="\'") {
-    cout << removeQuotes(msg) << '\n';
+    // quoted → preserve spaces
+    if ((msg.size() >= 2 &&
+        ((msg.front() == '"'  && msg.back() == '"') ||
+         (msg.front() == '\'' && msg.back() == '\'')))) {
+        cout << removeQuotes(msg) << '\n';
+    } else {
+        // unquoted → normalize spaces
+        cout << normalizeSpaces(msg) << '\n';
+    }
     continue;
-     }else{
-         cout << input.substr(5) << '\n';
-         continue;
-     }
-        }
-
+}
          if(input=="pwd"){
           cout << filesystem::current_path().string() << '\n';
              continue;
