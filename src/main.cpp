@@ -27,11 +27,38 @@ vector<string> split_path(const string &path) {
 
 vector<string> split_args(const string &input) {
     vector<string> args;
-    stringstream ss(input);
-    string token;
-    while (ss >> token) {
-        args.push_back(token);
+    string current_arg;
+    bool in_single_quote = false;
+    
+    for (size_t i = 0; i < input.length(); i++) {
+        char c = input[i];
+        
+        if (c == '\'' && !in_single_quote) {
+            // Start of single quote
+            in_single_quote = true;
+        }
+        else if (c == '\'' && in_single_quote) {
+            // End of single quote
+            in_single_quote = false;
+        }
+        else if ((c == ' ' || c == '\t') && !in_single_quote) {
+            // Whitespace outside quotes - end current argument
+            if (!current_arg.empty()) {
+                args.push_back(current_arg);
+                current_arg.clear();
+            }
+        }
+        else {
+            // Regular character or whitespace inside quotes
+            current_arg += c;
+        }
     }
+    
+    // Add the last argument if any
+    if (!current_arg.empty()) {
+        args.push_back(current_arg);
+    }
+    
     return args;
 }
 
@@ -63,26 +90,6 @@ void run_external(vector<string> &args) {
     }
 }
 
-string normalizeSpaces(const string& s){
-    stringstream ss(s);
-    string word,result;
-    while(ss>>word){
-        if(!result.empty())result += " ";
-        result += word;
-    }
-    return result; 
-}
-
-string removeQuotes(const string& s) {
-    if (s.size() >= 2) {
-        if ((s.front() == '"'  && s.back() == '"') ||
-            (s.front() == '\'' && s.back() == '\'')) {
-            return s.substr(1, s.size() - 2);
-        }
-    }
-    return s;
-}
-
 
 int main() {
     cout << unitbuf;
@@ -100,21 +107,19 @@ int main() {
             return 0;
         }
 
-       /* echo builtin */
-if (input.rfind("echo ", 0) == 0) {
-    string msg = input.substr(5);
-
-    // quoted → preserve spaces
-    if ((msg.size() >= 2 &&
-        ((msg.front() == '"'  && msg.back() == '"') ||
-         (msg.front() == '\'' && msg.back() == '\'')))) {
-        cout << removeQuotes(msg) << '\n';
-    } else {
-        // unquoted → normalize spaces
-        cout << normalizeSpaces(msg) << '\n';
+        /* echo builtin */
+      if (input.rfind("echo ", 0) == 0) {
+    vector<string> args = split_args(input.substr(5));
+    for (size_t i = 0; i < args.size(); i++) {
+        cout << args[i];
+        if (i < args.size() - 1) cout << ' ';
     }
+    cout << '\n';
     continue;
 }
+
+
+
          if(input=="pwd"){
           cout << filesystem::current_path().string() << '\n';
              continue;
