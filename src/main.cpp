@@ -93,6 +93,14 @@ int main() {
 
         if(input.rfind("cd ",0)==0){
             string path=input.substr(3);
+        
+            if(path=="~"){
+                 const char* home = std::getenv("HOME");
+                filesystem::current_path(home);                 
+                 continue;
+            }
+
+               
 
             try{
                 filesystem::current_path(path);
