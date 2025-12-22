@@ -92,11 +92,18 @@ int main() {
         }
 
         /* echo builtin */
-      if (input.rfind("echo ", 0) == 0) {
-    string msg = input.substr(5);
+        if (input.rfind("echo ", 0) == 0) {
+             
+       string msg = input.substr(5);
+
+   if (msg.front()=='\'' && msg.back()=="\'") {
     cout << removeQuotes(msg) << '\n';
     continue;
-}
+     }else{
+         cout << input.substr(5) << '\n';
+         continue;
+     }
+        }
 
          if(input=="pwd"){
           cout << filesystem::current_path().string() << '\n';
