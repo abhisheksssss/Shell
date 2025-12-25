@@ -29,6 +29,7 @@ vector<string> split_args(const string &input) {
     vector<string> args;
     string current_arg;
     bool in_single_quote = false;
+    bool in_double_quote = false;
     
     for (size_t i = 0; i < input.length(); i++) {
         char c = input[i];
@@ -47,6 +48,11 @@ vector<string> split_args(const string &input) {
                 args.push_back(current_arg);
                 current_arg.clear();
             }
+        }else if((c==" "||c=="\t")&& !in_double_quote){
+           if(!current_arg.empty()){
+            args.push_back(current_arg);
+            current_arg.clear();
+           }
         }
         else {
             // Regular character or whitespace inside quotes
@@ -118,7 +124,7 @@ int main() {
     continue;
 }
 
-
+        
 
          if(input=="pwd"){
           cout << filesystem::current_path().string() << '\n';
