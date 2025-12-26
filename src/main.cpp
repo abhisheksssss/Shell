@@ -33,6 +33,14 @@ vector<string> split_args(const string &input) {
 
     for (char c : input) {
 
+        if(c=="\\" && !in_single_quote || !in_double_quote ){
+            if(i+1<input.size()){
+                current +=input[i+1];
+                i++;
+            }
+            continue;
+        }
+        
         // Toggle single quote (only if not inside double quote)
         if (c == '\'' && !in_double_quote) {
             in_single_quote = !in_single_quote;
@@ -63,21 +71,6 @@ vector<string> split_args(const string &input) {
 
     return args;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 vector<char*> to_char_array(vector<string> &args) {
@@ -128,6 +121,7 @@ int main() {
         /* echo builtin */
       if (input.rfind("echo ", 0) == 0) {
     vector<string> args = split_args(input.substr(5));
+
     for (size_t i = 0; i < args.size(); i++) {
         cout << args[i];
         if (i < args.size() - 1) cout << ' ';
