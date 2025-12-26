@@ -114,29 +114,28 @@ vector<char*> to_char_array(vector<string> &args) {
     return result;
 }
 
+struct StdoutRedirect {
+    int saved = -1;
+    bool active = false;
 
-void run_external(vector<string> &args,bool redirect , const string &outfile){
-    pid_t pid=fork();
+    StdoutRedirect(bool enable, const string& outfile) {
+        if (!enable) return;
+        saved = dup(STDOUT_FILENO);
+        int fd = open(outfile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd < 0 || saved < 0) { perror("open/dup"); return; }
+        if (dup2(fd, STDOUT_FILENO) < 0) { perror("dup2"); return; }
+        close(fd);
+        active = true;
+    }
 
-      if (pid == 0) {
-        if (redirect) {
-            int fd = open(outfile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            if (fd < 0) { perror("open"); _exit(1); }
+    ~StdoutRedirect() {
+        if (!active) return;
+        dup2(saved, STDOUT_FILENO);
+        close(saved);
+    }
+};
 
-            if (dup2(fd, STDOUT_FILENO) < 0) { perror("dup2"); _exit(1); }
-            close(fd);
-        }
 
-        vector<char*>c_args=to_char_array(args);
-        execvp(c_args[0],c_args.data());
-        perror("execvp");
-        _exit(127);
- }else if(pid>0){
-    waitpid(pid,nullptr,0);
- }else{
-    perror("fork");
- }
-}
 
 int main() {
     cout << unitbuf;
@@ -148,6 +147,22 @@ int main() {
         getline(cin, input);
 
         if (input.empty()) continue;
+
+          vector<string> args = split_args(input);
+
+bool redirect = false;
+string outfile;
+
+for (size_t i = 0; i < args.size(); ) {
+    if (args[i] == ">" || args[i] == "1>") {
+        if (i + 1 >= args.size()) break;
+        redirect = true;
+        outfile = args[i + 1];
+        args.erase(args.begin() + i, args.begin() + i + 2);
+        continue;
+    }
+    i++;
+}
 
         /* exit builtin */
         if (input == "exit") {
@@ -220,27 +235,14 @@ if(input=="pwd"){
         }
 
         /* external command */
-       vector<string> args = split_args(input);
-
-bool redirect = false;
-string outfile;
-
-for (size_t i = 0; i < args.size(); ) {
-    if (args[i] == ">" || args[i] == "1>") {
-        if (i + 1 >= args.size()) {
-            // optional: print syntax error; for now just stop
-            break;
-        }
-        redirect = true;
-        outfile = args[i + 1];
-        args.erase(args.begin() + i, args.begin() + i + 2); // remove op + filename
-        continue;
+    
+if (!args.empty() && args[0] == "echo") {
+    StdoutRedirect r(redirect, outfile);     // makes cout go to file if redirect requested
+    for (size_t i = 1; i < args.size(); i++) {
+        cout << args[i] << (i + 1 < args.size() ? " " : "");
     }
-    i++;
-}
-
-if (!args.empty()) {
-    run_external(args, redirect, outfile);
+    cout << "\n";
+    continue;
 }
 
     }
