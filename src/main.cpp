@@ -62,6 +62,7 @@ vector<string> split_args(const string &input) {
 
     file << left << '\n';
     file.close();
+    continue;
 }
 
         /* Backslash handling */
