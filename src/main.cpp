@@ -115,7 +115,7 @@ vector<char*> to_char_array(vector<string> &args) {
 }
 
 
-void run_eexternal(vector<string> &args,bool redirect , const string &outfile){
+void run_external(vector<string> &args,bool redirect , const string &outfile){
     pid_t pid=fork();
 
       if (pid == 0) {
