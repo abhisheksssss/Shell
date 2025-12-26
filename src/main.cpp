@@ -7,6 +7,8 @@
 #include <sys/wait.h>
 #include <filesystem>
 #include <sstream>
+#include <fstream>
+
 
 using namespace std;
 
@@ -33,6 +35,34 @@ vector<string> split_args(const string &input) {
 
     for (size_t i = 0; i < input.size(); i++) {
         char c = input[i];
+
+
+
+        // Implementing operator
+
+       if (c == '>') {
+    // Left side (command output)
+    string left = input.substr(0, i);
+
+    // Right side (filename)
+    string right = input.substr(i + 1);
+
+    // Trim spaces
+    left.erase(0, left.find_first_not_of(" "));
+    left.erase(left.find_last_not_of(" ") + 1);
+
+    right.erase(0, right.find_first_not_of(" "));
+    right.erase(right.find_last_not_of(" ") + 1);
+
+    ofstream file(right);
+    if (!file) {
+        cerr << "Failed to open file\n";
+        continue;
+    }
+
+    file << left << '\n';
+    file.close();
+}
 
         /* Backslash handling */
         if (c == '\\') {
