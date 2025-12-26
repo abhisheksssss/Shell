@@ -28,11 +28,14 @@ vector<string> split_path(const string &path) {
 vector<string> split_args(const string &input) {
     vector<string> args;
     string current_arg;
-    bool in_single_quote = false;
     bool in_double_quote = false;
     
     for (size_t i = 0; i < input.length(); i++) {
         char c = input[i];
+
+        if(c=='"'){
+            in_double_quote=!in_double_quote;
+        }
         
         if (c == '\'' && !in_single_quote) {
             // Start of single quote
@@ -111,6 +114,7 @@ int main() {
         /* echo builtin */
       if (input.rfind("echo ", 0) == 0) {
     vector<string> args = split_args(input.substr(5));
+    cout<<args<<endl;
     for (size_t i = 0; i < args.size(); i++) {
         cout << args[i];
         if (i < args.size() - 1) cout << ' ';
