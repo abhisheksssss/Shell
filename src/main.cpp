@@ -33,7 +33,7 @@ vector<string> split_args(const string &input) {
 
     for (char c : input) {
 
-        if(c=="\\" && !in_single_quote || !in_double_quote ){
+        if(c=='\\' && !in_single_quote || !in_double_quote ){
             if(i+1<input.size()){
                 current +=input[i+1];
                 i++;
