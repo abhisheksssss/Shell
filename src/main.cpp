@@ -114,7 +114,6 @@ int main() {
         /* echo builtin */
       if (input.rfind("echo ", 0) == 0) {
     vector<string> args = split_args(input.substr(5));
-    cout<<args<<endl;
     for (size_t i = 0; i < args.size(); i++) {
         cout << args[i];
         if (i < args.size() - 1) cout << ' ';
