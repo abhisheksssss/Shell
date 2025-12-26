@@ -8,14 +8,21 @@
 #include <filesystem>
 #include <sstream>
 #include <fstream>
+#include <fcntl.h>
+
 
 
 using namespace std;
 
 
+
+
+
 bool is_executable(const string &path) {
     return access(path.c_str(), X_OK) == 0;
 }
+
+
 
 vector<string> split_path(const string &path) {
     vector<string> dirs;
@@ -32,38 +39,14 @@ vector<string> split_args(const string &input) {
     string current;
     bool in_single_quote = false;
     bool in_double_quote = false;
+    bool redirect=false;
+    string outfile;
+
+
 
     for (size_t i = 0; i < input.size(); i++) {
         char c = input[i];
-
-
-
-        // Implementing operator
-
-       if (c == '>') {
-    // Left side (command output)
-    string left = input.substr(0, i);
-
-    // Right side (filename)
-    string right = input.substr(i + 1);
-
-    // Trim spaces
-    left.erase(0, left.find_first_not_of(" "));
-    left.erase(left.find_last_not_of(" ") + 1);
-
-    right.erase(0, right.find_first_not_of(" "));
-    right.erase(right.find_last_not_of(" ") + 1);
-
-    ofstream file(right);
-    if (!file) {
-        cerr << "Failed to open file\n";
-        continue;
-    }
-
-    file << left << '\n';
-    file.close();
-    continue;
-}
+      
 
         /* Backslash handling */
         if (c == '\\') {
@@ -132,24 +115,28 @@ vector<char*> to_char_array(vector<string> &args) {
 }
 
 
-void run_external(vector<string> &args) {
-    pid_t pid = fork();
+void run_eexternal(vector<string> &args,bool redirect , const string &outfile){
+    pid_t pid=fork();
 
-    if (pid == 0) {
-        vector<char*> c_args = to_char_array(args);
-        execvp(c_args[0], c_args.data());
+      if (pid == 0) {
+        if (redirect) {
+            int fd = open(outfile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (fd < 0) { perror("open"); _exit(1); }
 
-        cerr << args[0] <<": command not found\n";
-        exit(127);
-    } 
-    else if (pid > 0) {
-        wait(nullptr);
-    } 
-    else {
-        perror("fork");
-    }
+            if (dup2(fd, STDOUT_FILENO) < 0) { perror("dup2"); _exit(1); }
+            close(fd);
+        }
+
+        vector<char*>c_args=to_char_array(args);
+        execvp(c_args[0],c_args.data());
+        perror("execvp");
+        _exit(127);
+ }else if(pid>0){
+    waitpid(pid,nullptr,0);
+ }else{
+    perror("fork");
+ }
 }
-
 
 int main() {
     cout << unitbuf;
@@ -233,9 +220,28 @@ if(input=="pwd"){
         }
 
         /* external command */
-        vector<string> args = split_args(input);
-        if (!args.empty()) {
-            run_external(args);
+       vector<string> args = split_args(input);
+
+bool redirect = false;
+string outfile;
+
+for (size_t i = 0; i < args.size(); ) {
+    if (args[i] == ">" || args[i] == "1>") {
+        if (i + 1 >= args.size()) {
+            // optional: print syntax error; for now just stop
+            break;
         }
+        redirect = true;
+        outfile = args[i + 1];
+        args.erase(args.begin() + i, args.begin() + i + 2); // remove op + filename
+        continue;
+    }
+    i++;
+}
+
+if (!args.empty()) {
+    run_external(args, redirect, outfile);
+}
+
     }
 }
