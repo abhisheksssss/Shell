@@ -48,11 +48,6 @@ vector<string> split_args(const string &input) {
                 args.push_back(current_arg);
                 current_arg.clear();
             }
-        }else if((c==" "||c=="\t")&& !in_double_quote){
-           if(!current_arg.empty()){
-            args.push_back(current_arg);
-            current_arg.clear();
-           }
         }
         else {
             // Regular character or whitespace inside quotes
@@ -85,7 +80,7 @@ void run_external(vector<string> &args) {
         vector<char*> c_args = to_char_array(args);
         execvp(c_args[0], c_args.data());
 
-        cerr << args[0] << ": command not found\n";
+        cerr << args[0] <<": command not found\n";
         exit(127);
     } 
     else if (pid > 0) {
@@ -123,10 +118,9 @@ int main() {
     cout << '\n';
     continue;
 }
-
         
 
-         if(input=="pwd"){
+if(input=="pwd"){
           cout << filesystem::current_path().string() << '\n';
              continue;
                }
