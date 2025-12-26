@@ -31,12 +31,13 @@ vector<string> split_args(const string &input) {
     bool in_single_quote = false;
     bool in_double_quote = false;
 
-    for (char c : input) {
+    for (size_t i = 0; i < input.size(); i++) {
+         char c = input[i];
 
-        if(c=='\\' && !in_single_quote || !in_double_quote ){
-            if(i+1<input.size()){
-                current +=input[i+1];
-                i++;
+     if (c == '\\' && !in_single_quote && !in_double_quote) {
+            if (i + 1 < input.size()) {
+                current += input[i + 1];
+                i++; // skip escaped character
             }
             continue;
         }
