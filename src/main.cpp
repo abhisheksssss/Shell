@@ -147,7 +147,7 @@ void run_external(vector<string> &args, bool redirect, const string &outfile) {
 
         vector<char*> c_args = to_char_array(args);
         execvp(c_args[0], c_args.data());
-        perror("execvp");
+       cerr << args[0] << ": command not found\n";
         _exit(127);
     } else if (pid > 0) {
         waitpid(pid, nullptr, 0);
