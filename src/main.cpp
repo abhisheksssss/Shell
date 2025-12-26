@@ -32,46 +32,63 @@ vector<string> split_args(const string &input) {
     bool in_double_quote = false;
 
     for (size_t i = 0; i < input.size(); i++) {
-         char c = input[i];
+        char c = input[i];
 
-     if (c == '\\' && !in_single_quote && !in_double_quote) {
-            if (i + 1 < input.size()) {
-                current += input[i + 1];
-                i++; // skip escaped character
+        /* Backslash handling */
+        if (c == '\\') {
+
+            if (!in_single_quote && !in_double_quote) {
+                if (i + 1 < input.size()) {
+                    current += input[i + 1];
+                    i++;
+                }
+                continue;
             }
+
+            if (in_double_quote) {
+                if (i + 1 < input.size()) {
+                    char next = input[i + 1];
+                    if (next == '"' || next == '\\') {
+                        current += next;
+                        i++;
+                    } else {
+                        current += '\\';
+                    }
+                }
+                continue;
+            }
+
+            current += '\\';
             continue;
-        }
-        
-        // Toggle single quote (only if not inside double quote)
+        }  // ← closes: if (c == '\\')
+
         if (c == '\'' && !in_double_quote) {
             in_single_quote = !in_single_quote;
             continue;
         }
 
-        // Toggle double quote (only if not inside single quote)
         if (c == '"' && !in_single_quote) {
             in_double_quote = !in_double_quote;
             continue;
         }
 
-        // Whitespace splits args only outside BOTH quotes
         if ((c == ' ' || c == '\t') && !in_single_quote && !in_double_quote) {
             if (!current.empty()) {
                 args.push_back(current);
                 current.clear();
             }
-        }
-        else {
+        } else {
             current += c;
         }
-    }
+
+    } // ← closes: for loop
 
     if (!current.empty()) {
         args.push_back(current);
     }
 
     return args;
-}
+} 
 
 
 vector<char*> to_char_array(vector<string> &args) {
@@ -145,8 +162,6 @@ if(input=="pwd"){
                 filesystem::current_path(home);                 
                  continue;
             }
-
-               
 
             try{
                 filesystem::current_path(path);
