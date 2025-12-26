@@ -10,19 +10,11 @@
 #include <fstream>
 #include <fcntl.h>
 
-
-
 using namespace std;
-
-
-
-
 
 bool is_executable(const string &path) {
     return access(path.c_str(), X_OK) == 0;
 }
-
-
 
 vector<string> split_path(const string &path) {
     vector<string> dirs;
@@ -39,18 +31,27 @@ vector<string> split_args(const string &input) {
     string current;
     bool in_single_quote = false;
     bool in_double_quote = false;
-    bool redirect=false;
-    string outfile;
-
-
 
     for (size_t i = 0; i < input.size(); i++) {
         char c = input[i];
-      
 
-        /* Backslash handling */
+        // NEW: tokenize stdout redirection operators when not inside quotes. [web:60]
+        if (!in_single_quote && !in_double_quote) {
+            if (c == '1' && i + 1 < input.size() && input[i + 1] == '>') {
+                if (!current.empty()) { args.push_back(current); current.clear(); }
+                args.push_back("1>");
+                i++; // consume '>'
+                continue;
+            }
+            if (c == '>') {
+                if (!current.empty()) { args.push_back(current); current.clear(); }
+                args.push_back(">");
+                continue;
+            }
+        }
+
+        /* Backslash handling (kept) */
         if (c == '\\') {
-
             if (!in_single_quote && !in_double_quote) {
                 if (i + 1 < input.size()) {
                     current += input[i + 1];
@@ -74,7 +75,7 @@ vector<string> split_args(const string &input) {
 
             current += '\\';
             continue;
-        }  // ← closes: if (c == '\\')
+        }
 
         if (c == '\'' && !in_double_quote) {
             in_single_quote = !in_single_quote;
@@ -94,36 +95,34 @@ vector<string> split_args(const string &input) {
         } else {
             current += c;
         }
-
-    } // ← closes: for loop
-
-    if (!current.empty()) {
-        args.push_back(current);
     }
 
+    if (!current.empty()) args.push_back(current);
     return args;
-} 
-
+}
 
 vector<char*> to_char_array(vector<string> &args) {
     vector<char*> result;
-    for (auto &arg : args) {
-        result.push_back(const_cast<char*>(arg.c_str()));
-    }
+    for (auto &arg : args) result.push_back(const_cast<char*>(arg.c_str()));
     result.push_back(nullptr);
     return result;
 }
 
+// Needed so echo (builtin) can redirect stdout in the shell process. [web:21]
 struct StdoutRedirect {
     int saved = -1;
     bool active = false;
 
     StdoutRedirect(bool enable, const string& outfile) {
         if (!enable) return;
+
         saved = dup(STDOUT_FILENO);
+        if (saved < 0) { perror("dup"); return; }
+
         int fd = open(outfile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-        if (fd < 0 || saved < 0) { perror("open/dup"); return; }
-        if (dup2(fd, STDOUT_FILENO) < 0) { perror("dup2"); return; }
+        if (fd < 0) { perror("open"); close(saved); saved = -1; return; }
+
+        if (dup2(fd, STDOUT_FILENO) < 0) { perror("dup2"); close(fd); close(saved); saved = -1; return; }
         close(fd);
         active = true;
     }
@@ -135,7 +134,27 @@ struct StdoutRedirect {
     }
 };
 
+// External redirection: open + dup2 before execvp in child. [web:22]
+void run_external(vector<string> &args, bool redirect, const string &outfile) {
+    pid_t pid = fork();
+    if (pid == 0) {
+        if (redirect) {
+            int fd = open(outfile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (fd < 0) { perror("open"); _exit(1); }
+            if (dup2(fd, STDOUT_FILENO) < 0) { perror("dup2"); _exit(1); }
+            close(fd);
+        }
 
+        vector<char*> c_args = to_char_array(args);
+        execvp(c_args[0], c_args.data());
+        perror("execvp");
+        _exit(127);
+    } else if (pid > 0) {
+        waitpid(pid, nullptr, 0);
+    } else {
+        perror("fork");
+    }
+}
 
 int main() {
     cout << unitbuf;
@@ -148,67 +167,67 @@ int main() {
 
         if (input.empty()) continue;
 
-          vector<string> args = split_args(input);
+        vector<string> args = split_args(input);
 
-bool redirect = false;
-string outfile;
+        // Parse and remove > / 1> so execvp doesn't receive them. [web:60]
+        bool redirect = false;
+        string outfile;
 
-for (size_t i = 0; i < args.size(); ) {
-    if (args[i] == ">" || args[i] == "1>") {
-        if (i + 1 >= args.size()) break;
-        redirect = true;
-        outfile = args[i + 1];
-        args.erase(args.begin() + i, args.begin() + i + 2);
-        continue;
-    }
-    i++;
-}
-
-        /* exit builtin */
-        if (input == "exit") {
-            return 0;
+        for (size_t i = 0; i < args.size(); ) {
+            if (args[i] == ">" || args[i] == "1>") {
+                if (i + 1 >= args.size()) break;
+                redirect = true;
+                outfile = args[i + 1];
+                args.erase(args.begin() + i, args.begin() + i + 2);
+                continue;
+            }
+            i++;
         }
 
-        /* echo builtin */
-      if (input.rfind("echo ", 0) == 0) {
-    vector<string> args = split_args(input.substr(5));
+        if (args.empty()) continue;
 
-    for (size_t i = 0; i < args.size(); i++) {
-        cout << args[i];
-        if (i < args.size() - 1) cout << ' ';
-    }
-    cout << '\n';
-    continue;
-}
-        
+        /* exit builtin */
+        if (args[0] == "exit") return 0;
 
-if(input=="pwd"){
-          cout << filesystem::current_path().string() << '\n';
-             continue;
-               }
+        /* echo builtin (ONLY this echo; remove input.rfind echo) */
+        if (args[0] == "echo") {
+            StdoutRedirect r(redirect, outfile);
+            for (size_t i = 1; i < args.size(); i++) {
+                cout << args[i];
+                if (i + 1 < args.size()) cout << ' ';
+            }
+            cout << '\n';
+            continue;
+        }
 
-        if(input.rfind("cd ",0)==0){
-            string path=input.substr(3);
-        
-            if(path=="~"){
-                 const char* home = std::getenv("HOME");
-                filesystem::current_path(home);                 
-                 continue;
+        /* pwd builtin */
+        if (args[0] == "pwd") {
+            cout << filesystem::current_path().string() << '\n';
+            continue;
+        }
+
+        /* cd builtin */
+        if (args[0] == "cd") {
+            string path = (args.size() >= 2 ? args[1] : "");
+            if (path == "~") {
+                const char* home = std::getenv("HOME");
+                if (home) filesystem::current_path(home);
+                continue;
             }
 
-            try{
+            try {
                 filesystem::current_path(path);
-            }catch(const filesystem::filesystem_error& e){
-                cout<<"cd: "<<path<<": No such file or directory"<<"\n";
+            } catch (const filesystem::filesystem_error&) {
+                cout << "cd: " << path << ": No such file or directory\n";
             }
             continue;
         }
 
         /* type builtin */
-        if (input.rfind("type ", 0) == 0) {
-            string cmd = input.substr(5);
+        if (args[0] == "type") {
+            string cmd = (args.size() >= 2 ? args[1] : "");
 
-            if (cmd == "exit" || cmd == "echo" || cmd == "type"||cmd=="pwd") {
+            if (cmd == "exit" || cmd == "echo" || cmd == "type" || cmd == "pwd" || cmd == "cd") {
                 cout << cmd << " is a shell builtin\n";
                 continue;
             }
@@ -228,22 +247,11 @@ if(input=="pwd"){
                 }
             }
 
-            if (!found) {
-                cout << cmd << ": not found\n";
-            }
+            if (!found) cout << cmd << ": not found\n";
             continue;
         }
 
         /* external command */
-    
-if (!args.empty() && args[0] == "echo") {
-    StdoutRedirect r(redirect, outfile);     // makes cout go to file if redirect requested
-    for (size_t i = 1; i < args.size(); i++) {
-        cout << args[i] << (i + 1 < args.size() ? " " : "");
-    }
-    cout << "\n";
-    continue;
-}
-
+        run_external(args, redirect, outfile);
     }
 }
