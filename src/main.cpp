@@ -27,44 +27,58 @@ vector<string> split_path(const string &path) {
 
 vector<string> split_args(const string &input) {
     vector<string> args;
-    string current_arg;
+    string current;
+    bool in_single_quote = false;
     bool in_double_quote = false;
-    
-    for (size_t i = 0; i < input.length(); i++) {
-        char c = input[i];
 
-        if(c=='"'){
-            in_double_quote=!in_double_quote;
+    for (char c : input) {
+
+        // Toggle single quote (only if not inside double quote)
+        if (c == '\'' && !in_double_quote) {
+            in_single_quote = !in_single_quote;
+            continue;
         }
-        
-        if (c == '\'' && !in_single_quote) {
-            // Start of single quote
-            in_single_quote = true;
+
+        // Toggle double quote (only if not inside single quote)
+        if (c == '"' && !in_single_quote) {
+            in_double_quote = !in_double_quote;
+            continue;
         }
-        else if (c == '\'' && in_single_quote) {
-            // End of single quote
-            in_single_quote = false;
-        }
-        else if ((c == ' ' || c == '\t') && !in_single_quote) {
-            // Whitespace outside quotes - end current argument
-            if (!current_arg.empty()) {
-                args.push_back(current_arg);
-                current_arg.clear();
+
+        // Whitespace splits args only outside BOTH quotes
+        if ((c == ' ' || c == '\t') && !in_single_quote && !in_double_quote) {
+            if (!current.empty()) {
+                args.push_back(current);
+                current.clear();
             }
         }
         else {
-            // Regular character or whitespace inside quotes
-            current_arg += c;
+            current += c;
         }
     }
-    
-    // Add the last argument if any
-    if (!current_arg.empty()) {
-        args.push_back(current_arg);
+
+    if (!current.empty()) {
+        args.push_back(current);
     }
-    
+
     return args;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 vector<char*> to_char_array(vector<string> &args) {
     vector<char*> result;
