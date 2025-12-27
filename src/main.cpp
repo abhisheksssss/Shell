@@ -43,6 +43,15 @@ vector<string> split_args(const string &input) {
                 i++; // consume '>'
                 continue;
             }
+            if(c=='2'&&i+1<input.size() && input[i+1]){
+                if(!current.empty()){
+                    args.push_back(current);
+                    current.clear();
+                }
+                args.push_back("2>");
+                i++;
+                continue;
+            }
             if (c == '>') {
                 if (!current.empty()) { args.push_back(current); current.clear(); }
                 args.push_back(">");
@@ -101,12 +110,16 @@ vector<string> split_args(const string &input) {
     return args;
 }
 
+
+
+
 vector<char*> to_char_array(vector<string> &args) {
     vector<char*> result;
     for (auto &arg : args) result.push_back(const_cast<char*>(arg.c_str()));
     result.push_back(nullptr);
     return result;
 }
+
 
 // Needed so echo (builtin) can redirect stdout in the shell process. [web:21]
 struct StdoutRedirect {
@@ -135,13 +148,24 @@ struct StdoutRedirect {
 };
 
 // External redirection: open + dup2 before execvp in child. [web:22]
-void run_external(vector<string> &args, bool redirect, const string &outfile) {
+void run_external(vector<string> &args, bool redirect_out, const string &outfile,bool redirect_err,const string &errfile) {
+    
+    
     pid_t pid = fork();
     if (pid == 0) {
-        if (redirect) {
+        if (redirect_out) {
             int fd = open(outfile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
             if (fd < 0) { perror("open"); _exit(1); }
             if (dup2(fd, STDOUT_FILENO) < 0) { perror("dup2"); _exit(1); }
+            close(fd);
+        }
+        if(redirect_err){
+            int fd = open(outfile.c_str(),O_WRONLY|O_CREAT|O_TRUNC,0644);
+            if(fd<0){
+                perror("open");
+                _exit(1);
+            }
+            dup2(fd,STDERR_FILENO);
             close(fd);
         }
 
@@ -170,15 +194,23 @@ int main() {
         vector<string> args = split_args(input);
 
         // Parse and remove > / 1> so execvp doesn't receive them. [web:60]
-        bool redirect = false;
+        bool redirect_out= false;
+       bool redirect_err=false;
         string outfile;
+        string errfile;
 
         for (size_t i = 0; i < args.size(); ) {
             if (args[i] == ">" || args[i] == "1>") {
                 if (i + 1 >= args.size()) break;
-                redirect = true;
+                redirect_out = true;
                 outfile = args[i + 1];
                 args.erase(args.begin() + i, args.begin() + i + 2);
+                continue;
+            }
+            if(args[i]=="2>"){
+                redirect_err=true;
+                errfile=args[i+1];
+                args.erase(args.begin()+i,args.begin()+i+2);
                 continue;
             }
             i++;
@@ -191,7 +223,7 @@ int main() {
 
         /* echo builtin (ONLY this echo; remove input.rfind echo) */
         if (args[0] == "echo") {
-            StdoutRedirect r(redirect, outfile);
+            StdoutRedirect r(redirect_out, outfile);
             for (size_t i = 1; i < args.size(); i++) {
                 cout << args[i];
                 if (i + 1 < args.size()) cout << ' ';
@@ -252,6 +284,7 @@ int main() {
         }
 
         /* external command */
-        run_external(args, redirect, outfile);
+        run_external(args, redirect_out, outfile,redirect_err,errfile);
     }
 }
+
