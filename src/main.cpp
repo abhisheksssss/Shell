@@ -222,13 +222,27 @@ int main() {
 
         /* echo builtin (ONLY this echo; remove input.rfind echo) */
         if (args[0] == "echo") {
-            StdoutRedirect r(redirect_out, outfile);
-            for (size_t i = 1; i < args.size(); i++) {
-                cout << args[i];
-                if (i + 1 < args.size()) cout << ' ';
-            }
-            cout << '\n';
-            continue;
+
+if(redirect_err){
+    int fd=open(errfile.c_str(),O_WRONLY|O_CREAT|O_TRUNC,0644);
+    if(fd>=0)close(fd);
+} 
+StdoutRedirect r(redirect_out,outfile);
+for(size_t i=1;i<args.size();i++){
+    cout<<args[i];
+    if(i+1<args.size()) cout<<'';
+}
+cout<<"\n";
+continue;
+
+
+            // StdoutRedirect r(redirect_out, outfile);
+            // for (size_t i = 1; i < args.size(); i++) {
+            //     cout << args[i];
+            //     if (i + 1 < args.size()) cout << ' ';
+            // }
+            // cout << '\n';
+            // continue;
         }
 
         /* pwd builtin */
