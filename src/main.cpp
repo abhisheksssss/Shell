@@ -43,7 +43,7 @@ vector<string> split_args(const string &input) {
                 i++; // consume '>'
                 continue;
             }
-            if(c=='2'&&i+1<input.size() && input[i+1]){
+            if(c=='2'&&i+1<input.size() && input[i+1]=='>'){
                 if(!current.empty()){
                     args.push_back(current);
                     current.clear();
@@ -155,14 +155,13 @@ void run_external(vector<string> &args, bool redirect_out, const string &outfile
     if (pid == 0) {
         if (redirect_out) {
             int fd = open(outfile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            if (fd < 0) { perror("open"); _exit(1); }
+            if (fd < 0) { _exit(1); }
             if (dup2(fd, STDOUT_FILENO) < 0) { perror("dup2"); _exit(1); }
             close(fd);
         }
         if(redirect_err){
-            int fd = open(outfile.c_str(),O_WRONLY|O_CREAT|O_TRUNC,0644);
+            int fd = open(errfile.c_str(),O_WRONLY|O_CREAT|O_TRUNC,0644);
             if(fd<0){
-                perror("open");
                 _exit(1);
             }
             dup2(fd,STDERR_FILENO);
