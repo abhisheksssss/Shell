@@ -37,6 +37,11 @@ vector<string> split_args(const string &input) {
 
         // NEW: tokenize stdout redirection operators when not inside quotes. [web:60]
         if (!in_single_quote && !in_double_quote) {
+            if(c == '1' && i + 1 < input.size() && input[i + 1] == '>'){
+              if(!)
+            }
+
+
             if (c == '1' && i + 1 < input.size() && input[i + 1] == '>') {
                 if (!current.empty()) { args.push_back(current); current.clear(); }
                 args.push_back("1>");
@@ -139,12 +144,32 @@ struct StdoutRedirect {
         close(fd);
         active = true;
     }
+    StdAppendRedirect(bool enable, const string& outfile) {
+
+        if (!enable) return;
+
+        saved = dup(STDOUT_FILENO);
+        if (saved < 0) { perror("dup"); return; }
+
+        int fd = open(outfile.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
+        if (fd < 0) { perror("open"); close(saved); saved = -1; return; }
+
+        if (dup2(fd, STDOUT_FILENO) < 0) { perror("dup2"); close(fd); close(saved); saved = -1; return; }
+        close(fd);
+        active = true;
+    }
 
     ~StdoutRedirect() {
         if (!active) return;
         dup2(saved, STDOUT_FILENO);
         close(saved);
     }
+    ~StdAppendRedirect() {
+    if (active && saved >= 0) {
+        dup2(saved, STDOUT_FILENO);
+        close(saved);
+    }
+}
 };
 
 // External redirection: open + dup2 before execvp in child. [web:22]
@@ -195,8 +220,11 @@ int main() {
         // Parse and remove > / 1> so execvp doesn't receive them. [web:60]
         bool redirect_out= false;
        bool redirect_err=false;
+       bool redirect_append=false;
+    
         string outfile;
         string errfile;
+        string appendfile;
 
         for (size_t i = 0; i < args.size(); ) {
             if (args[i] == ">" || args[i] == "1>") {
@@ -212,6 +240,11 @@ int main() {
                 args.erase(args.begin()+i,args.begin()+i+2);
                 continue;
             }
+            if(args[i]==">>"|| args[i]=="1>>"){
+            redirect_append=true;
+            appendfile=args[i+1];
+            args.erase(args.begin()+i,args.begin()+i+2);
+            }
             i++;
         }
 
@@ -225,12 +258,14 @@ int main() {
 
 if (args[0] == "echo") {
     // NEW: ensure 2> file exists for builtin
+
     if (redirect_err) {
         int fd = open(errfile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
         if (fd >= 0) close(fd);
     }
 
     StdoutRedirect r(redirect_out, outfile);
+    StdoutRedirect r1(redirect_append,appendfile);
     for (size_t i = 1; i < args.size(); i++) {
         cout << args[i];
         if (i + 1 < args.size()) cout << ' ';
