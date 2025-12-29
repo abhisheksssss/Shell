@@ -265,7 +265,7 @@ if (args[0] == "echo") {
     }
 
     StdoutRedirect r(redirect_out, outfile);
-    StdoutRedirect r1(redirect_append,appendfile);
+    StdAppendRedirect r1(redirect_append,appendfile);
     for (size_t i = 1; i < args.size(); i++) {
         cout << args[i];
         if (i + 1 < args.size()) cout << ' ';
