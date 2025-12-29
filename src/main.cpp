@@ -42,7 +42,7 @@ vector<string> split_args(const string &input)
         // NEW: tokenize stdout redirection operators when not inside quotes. [web:60]
         if (!in_single_quote && !in_double_quote)
         {
-
+              //1>>
             if (c == '1' && i + 2 < input.size() && input[i + 1] == '>' && input[i + 2] == '>')
             {
                 if (!current.empty())
@@ -55,6 +55,19 @@ vector<string> split_args(const string &input)
                 continue;
             }
 
+            // 2>>
+              if (c == '2' && i + 2 < input.size() &&
+        input[i + 1] == '>' && input[i + 2] == '>') {
+
+        if (!current.empty()) {
+            args.push_back(current);
+            current.clear();
+        }
+        args.push_back("2>>");
+        i += 2;
+        continue;
+    }
+
             if (c == '>' && i + 1 < input.size() && input[i + 1] == '>')
             {
                 if (!current.empty())
@@ -66,26 +79,7 @@ vector<string> split_args(const string &input)
                 i++;
                 continue;
             }
-             if(c=="2"&&i+2<input.size()&& input[i+1]==">"&& input[i+2]==">"){
-                       input[i + 1] == '>' && input[i + 2] == '>') {
 
-        if (!current.empty()) {
-            args.push_back(current);
-            current.clear();
-        }
-        args.push_back("2>>");
-        i += 2;
-        continue;
-             }
-                if (c == '2' && i + 1 < input.size() && input[i + 1] == '>') {
-        if (!current.empty()) {
-            args.push_back(current);
-            current.clear();
-        }
-        args.push_back("2>");
-        i++;
-        continue;
-    }
             if (c == '1' && i + 1 < input.size() && input[i + 1] == '>')
             {
                 if (!current.empty())
@@ -185,7 +179,7 @@ vector<string> split_args(const string &input)
         args.push_back(current);
     return args;
 }
-}
+
 vector<char *> to_char_array(vector<string> &args)
 {
     vector<char *> result;
@@ -359,8 +353,7 @@ int main()
         if (args[0] == "echo")
         {
 
-            if (args[0] == "echo")
-            {
+           
                 // NEW: ensure 2> file exists for builtin
 
                 if (redirect_err)
@@ -379,7 +372,7 @@ int main()
                 }
                 cout << '\n';
                 continue;
-            }
+            
         }
 
         /* pwd builtin */
