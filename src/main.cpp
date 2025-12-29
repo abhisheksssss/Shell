@@ -37,7 +37,7 @@ vector<string> split_args(const string &input) {
         // NEW: tokenize stdout redirection operators when not inside quotes. [web:60]
 if (!in_single_quote && !in_double_quote) {
 
-         if(c=="1" && i+2<input.size()&&input[i+1]==">"&&input[i+2]==">"){
+         if (c == '1' && i + 2 < input.size() && input[i + 1] == '>' && input[i + 2] == '>') {
             if(!current.empty()){
                 args.push_back(current);
                 current.clear();
@@ -46,6 +46,16 @@ if (!in_single_quote && !in_double_quote) {
             i+=2;
             continue;
          }
+
+         if (c == '>' && i + 1 < input.size() && input[i + 1] == '>') {
+    if (!current.empty()) {
+        args.push_back(current);
+        current.clear();
+    }
+    args.push_back(">>");
+    i++;
+    continue;
+}
 
             if (c == '1' && i + 1 < input.size() && input[i + 1] == '>') {
                 if (!current.empty()) { args.push_back(current); current.clear(); }
@@ -158,17 +168,18 @@ struct StdoutRedirect {
 };
 
 // External redirection: open + dup2 before execvp in child. [web:22]
-void run_external(vector<string> &args, bool redirect_out, const string &outfile,bool redirect_err,const string &errfile) {
+void run_external(vector<string> &args, bool redirect_out, const string &outfile,bool append,bool redirect_err,const string &errfile) {
     
     
     pid_t pid = fork();
     if (pid == 0) {
-        if (redirect_out) {
-          int flags = O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC);
-        int fd = open(outfile.c_str(), flags, 0644);
-        dup2(fd, STDOUT_FILENO);
-        close(fd);
-        }
+       if (redirect_out) {
+    int flags = O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC);
+    int fd = open(outfile.c_str(), flags, 0644);
+    if (fd < 0) _exit(1);
+    dup2(fd, STDOUT_FILENO);
+    close(fd);
+}
         if(redirect_err){
             int fd = open(errfile.c_str(),O_WRONLY|O_CREAT|O_TRUNC,0644);
             if(fd<0){
@@ -315,7 +326,7 @@ if (args[0] == "echo") {
         }
 
         /* external command */
-        run_external(args, redirect_out, outfile,redirect_err,errfile);
+        run_external(args, redirect_out, outfile,append,redirect_err,errfile);
     }
 }
 
