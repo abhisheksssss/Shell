@@ -34,13 +34,18 @@ vector<string> split_args(const string &input) {
 
     for (size_t i = 0; i < input.size(); i++) {
         char c = input[i];
-
         // NEW: tokenize stdout redirection operators when not inside quotes. [web:60]
-        if (!in_single_quote && !in_double_quote) {
-            if(c == '1' && i + 1 < input.size() && input[i + 1] == '>'){
-              if(!)
-            }
+if (!in_single_quote && !in_double_quote) {
 
+         if(c=="1" && i+2<input.size()&&input[i+1]==">"&&input[i+2]==">"){
+            if(!current.empty()){
+                args.push_back(current);
+                current.clear();
+            }
+            args.push_back("1>>");
+            i+=2;
+            continue;
+         }
 
             if (c == '1' && i + 1 < input.size() && input[i + 1] == '>') {
                 if (!current.empty()) { args.push_back(current); current.clear(); }
@@ -131,27 +136,13 @@ struct StdoutRedirect {
     int saved = -1;
     bool active = false;
 
-    StdoutRedirect(bool enable, const string& outfile) {
+    StdoutRedirect(bool enable, const string& outfile,bool append) {
         if (!enable) return;
 
         saved = dup(STDOUT_FILENO);
         if (saved < 0) { perror("dup"); return; }
 
-        int fd = open(outfile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-        if (fd < 0) { perror("open"); close(saved); saved = -1; return; }
-
-        if (dup2(fd, STDOUT_FILENO) < 0) { perror("dup2"); close(fd); close(saved); saved = -1; return; }
-        close(fd);
-        active = true;
-    }
-    StdAppendRedirect(bool enable, const string& outfile) {
-
-        if (!enable) return;
-
-        saved = dup(STDOUT_FILENO);
-        if (saved < 0) { perror("dup"); return; }
-
-        int fd = open(outfile.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
+        int fd = open(outfile.c_str(), O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC), 0644);
         if (fd < 0) { perror("open"); close(saved); saved = -1; return; }
 
         if (dup2(fd, STDOUT_FILENO) < 0) { perror("dup2"); close(fd); close(saved); saved = -1; return; }
@@ -164,12 +155,6 @@ struct StdoutRedirect {
         dup2(saved, STDOUT_FILENO);
         close(saved);
     }
-    ~StdAppendRedirect() {
-    if (active && saved >= 0) {
-        dup2(saved, STDOUT_FILENO);
-        close(saved);
-    }
-}
 };
 
 // External redirection: open + dup2 before execvp in child. [web:22]
@@ -179,10 +164,10 @@ void run_external(vector<string> &args, bool redirect_out, const string &outfile
     pid_t pid = fork();
     if (pid == 0) {
         if (redirect_out) {
-            int fd = open(outfile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            if (fd < 0) { _exit(1); }
-            if (dup2(fd, STDOUT_FILENO) < 0) { perror("dup2"); _exit(1); }
-            close(fd);
+          int flags = O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC);
+        int fd = open(outfile.c_str(), flags, 0644);
+        dup2(fd, STDOUT_FILENO);
+        close(fd);
         }
         if(redirect_err){
             int fd = open(errfile.c_str(),O_WRONLY|O_CREAT|O_TRUNC,0644);
@@ -220,16 +205,17 @@ int main() {
         // Parse and remove > / 1> so execvp doesn't receive them. [web:60]
         bool redirect_out= false;
        bool redirect_err=false;
-       bool redirect_append=false;
+       bool append = false;
     
         string outfile;
         string errfile;
-        string appendfile;
+     
 
         for (size_t i = 0; i < args.size(); ) {
             if (args[i] == ">" || args[i] == "1>") {
                 if (i + 1 >= args.size()) break;
                 redirect_out = true;
+                  append = false;
                 outfile = args[i + 1];
                 args.erase(args.begin() + i, args.begin() + i + 2);
                 continue;
@@ -240,11 +226,13 @@ int main() {
                 args.erase(args.begin()+i,args.begin()+i+2);
                 continue;
             }
-            if(args[i]==">>"|| args[i]=="1>>"){
-            redirect_append=true;
-            appendfile=args[i+1];
-            args.erase(args.begin()+i,args.begin()+i+2);
-            }
+            if (args[i] == ">>" || args[i] == "1>>") {
+        redirect_out = true;
+        append = true;
+        outfile = args[i+1];
+        args.erase(args.begin()+i, args.begin()+i+2);
+        continue;
+    }
             i++;
         }
 
@@ -264,8 +252,7 @@ if (args[0] == "echo") {
         if (fd >= 0) close(fd);
     }
 
-    StdoutRedirect r(redirect_out, outfile);
-    StdAppendRedirect r1(redirect_append,appendfile);
+    StdoutRedirect r(redirect_out, outfile,append);
     for (size_t i = 1; i < args.size(); i++) {
         cout << args[i];
         if (i + 1 < args.size()) cout << ' ';
