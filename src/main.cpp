@@ -16,6 +16,9 @@
 
 using namespace std;
 
+bool is_executable(const string &path);
+vector<string> split_path(const string &path);
+
 
 const char* builtin_command[]={"echo","exit",nullptr};
 
