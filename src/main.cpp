@@ -9,8 +9,46 @@
 #include <sstream>
 #include <fstream>
 #include <fcntl.h>
+#include<readline/readline.h>
+#include<readline/history.h>
 
 using namespace std;
+
+
+const char* builtin_command[]={"echo","exit",nullptr};
+
+
+char* command_generator(const char* text,int state){
+static int list_index,len;
+const char* name;
+
+if(!state){
+    list_index=0;
+    len=strlen(text);
+}
+
+while((name=builtin_command[list_index])){
+    list_index++;
+    if(strncmp(name,text,len)==0){
+        return strdup(name);
+    }
+}
+return nullptr;
+}
+
+
+
+char** command_completion(const char* text,int start,int end){
+    r1_attempted_completion_over=1;
+
+    if(start==0){
+        return r1_attempted_completion_over(text,command_generator);
+    }
+
+    return nullptr;
+}
+
+
 
 bool is_executable(const string &path)
 {
@@ -281,12 +319,15 @@ int main()
 {
     cout << unitbuf;
     cerr << unitbuf;
+    rl_attempted_completion_function = command_completion;
 
-    while (true)
+     char* input_buffer;
+
+    while ((input_buffer=readline("$ "))!=nullptr)
     {
         cout << "$ ";
-        string input;
-        getline(cin, input);
+        string input(input_buffer);
+        free(input_buffer);
 
         if (input.empty())
             continue;
