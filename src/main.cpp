@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include<readline/readline.h>
 #include<readline/history.h>
+#include<cstring>
 
 using namespace std;
 
@@ -38,13 +39,13 @@ return nullptr;
 
 
 
-char** command_completion(const char* text,int start,int end){
-    r1_attempted_completion_over=1;
-
-    if(start==0){
-        return r1_attempted_completion_over(text,command_generator);
+char** command_completion(const char* text, int start, int end){
+    rl_attempted_completion_over = 1;  // Fixed: "rl" not "r1"
+    
+    if(start == 0){
+        return rl_completion_matches(text, command_generator);  // Fixed: correct function
     }
-
+    
     return nullptr;
 }
 
@@ -325,7 +326,6 @@ int main()
 
     while ((input_buffer=readline("$ "))!=nullptr)
     {
-        cout << "$ ";
         string input(input_buffer);
         free(input_buffer);
 
