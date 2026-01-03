@@ -397,6 +397,8 @@ int main()
         bool redirect_err = false;
         bool append = false;
         bool err_append=false;
+        bool has_pipe=false;
+        size_t pipe_index=0;
 
 
         string outfile;
@@ -404,6 +406,12 @@ int main()
 
         for (size_t i = 0; i < args.size();)
         {
+            if(args[i]=="|"){
+                    has_pipe=true;
+                    pipe_index=i;
+                    break;
+            }  
+
             if (args[i] == ">" || args[i] == "1>")
             {
                 if (i + 1 >= args.size())
@@ -440,6 +448,44 @@ int main()
 
             i++;
         }
+
+         if(has_pipe==true){
+          vector<string> left_cmd(args.begin(),args.begin()+pipe_index);
+          vector<string> right_cmd(args.begin() + pipe_index + 1, args.end());
+          int fd[2];
+          pipe(fd);
+
+          pid_t pid1=fork();
+
+          if(pid1==0){
+            dup2(fd[1],STDOUT_FILENO);
+            close(fd[0]);
+            close(fd[1]);
+
+             vector<char*>cargs=to_char_array(left_cmd);
+             execvp(cargs[0],cargs.data());
+            _exit(1);
+            }
+
+        pid_t pid2=fork();
+        if(pid2==0){
+            dup2(fd[0],STDIN_FILENO);
+            close(fd[1]);
+            close(fd[0]);
+
+            vector<char*>cargs=to_char_array(right_cmd);
+            execvp(cargs[0],cargs.data());
+            _exit(1);
+        }
+        close(fd[0]);
+        close(fd[1]);
+
+        waitpid(pid1,nullptr,0);
+        waitpid(pid2,nullptr,0);
+
+        continue;
+         }
+
 
         if (args.empty())
             continue;
