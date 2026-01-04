@@ -404,7 +404,7 @@ int main()
         string outfile;
         string errfile;
 
-        for (size_t i = 0; i < args.size())
+        for (size_t i = 0; i < args.size();)
         {
             if(args[i]=="|"){
                     has_pipe=true;
