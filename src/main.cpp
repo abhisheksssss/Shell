@@ -9,8 +9,105 @@
 #include <sstream>
 #include <fstream>
 #include <fcntl.h>
+#include<readline/readline.h>
+#include<readline/history.h>
+#include<cstring>
+#include <dirent.h>
 
 using namespace std;
+
+bool is_executable(const string &path);
+vector<string> split_path(const string &path);
+
+
+const char* builtin_command[]={"echo","exit",nullptr};
+
+
+char* command_generator(const char* text, int state) {
+    static int list_index, len;
+    static vector<string> path_dirs;
+    static size_t path_index;
+    static DIR* dir_handle;
+    static string current_dir;
+    const char* name;
+
+    // First call: initialize
+    if (!state) {
+        list_index = 0;
+        len = strlen(text);
+        path_index = 0;
+        dir_handle = nullptr;
+        current_dir.clear();
+        
+        // Get PATH directories
+        path_dirs.clear();
+        char* path_env = getenv("PATH");
+        if (path_env) {
+            path_dirs = split_path(path_env);
+        }
+    }
+
+    // First, check builtin commands
+    while ((name = builtin_command[list_index])) {
+        list_index++;
+        if (strncmp(name, text, len) == 0) {
+            return strdup(name);
+        }
+    }
+
+    // Then search through PATH directories for executables
+    while (path_index < path_dirs.size()) {
+        // Open the next directory if needed
+        if (dir_handle == nullptr) {
+            current_dir = path_dirs[path_index];
+            path_index++;
+            
+            // Skip non-existent directories
+            dir_handle = opendir(current_dir.c_str());
+            if (dir_handle == nullptr) {
+                continue;
+            }
+        }
+
+        // Read entries from current directory
+        struct dirent* entry;
+        while ((entry = readdir(dir_handle)) != nullptr) {
+            // Skip hidden files and directories
+            if (entry->d_name[0] == '.') {
+                continue;
+            }
+
+            // Check if name matches prefix
+            if (strncmp(entry->d_name, text, len) == 0) {
+                // Check if file is executable
+                string full_path = current_dir + "/" + entry->d_name;
+                if (is_executable(full_path)) {
+                    // Return this match (keep dir_handle open for next call)
+                    return strdup(entry->d_name);
+                }
+            }
+        }
+
+        // Finished with this directory
+        closedir(dir_handle);
+        dir_handle = nullptr;
+    }
+
+    return nullptr;
+}
+
+
+char** command_completion(const char* text, int start, int end){
+    rl_attempted_completion_over = 1;  // Fixed: "rl" not "r1"
+    
+    if(start == 0){
+        return rl_completion_matches(text, command_generator);  // Fixed: correct function
+    }
+    
+    return nullptr;
+}
+
+
 
 bool is_executable(const string &path)
 {
@@ -281,12 +378,14 @@ int main()
 {
     cout << unitbuf;
     cerr << unitbuf;
+    rl_attempted_completion_function = command_completion;
 
-    while (true)
+     char* input_buffer;
+
+    while ((input_buffer=readline("$ "))!=nullptr)
     {
-        cout << "$ ";
-        string input;
-        getline(cin, input);
+        string input(input_buffer);
+        free(input_buffer);
 
         if (input.empty())
             continue;
@@ -298,6 +397,8 @@ int main()
         bool redirect_err = false;
         bool append = false;
         bool err_append=false;
+        bool has_pipe=false;
+        size_t pipe_index=0;
 
 
         string outfile;
@@ -305,6 +406,12 @@ int main()
 
         for (size_t i = 0; i < args.size();)
         {
+            if(args[i]=="|"){
+                    has_pipe=true;
+                    pipe_index=i;
+                    break;
+            }  
+
             if (args[i] == ">" || args[i] == "1>")
             {
                 if (i + 1 >= args.size())
@@ -338,9 +445,116 @@ int main()
         args.erase(args.begin() + i, args.begin() + i + 2);
         continue;
             }
-
             i++;
         }
+
+
+
+
+
+
+        if(has_pipe){
+    vector<string> left_cmd(args.begin(), args.begin()+pipe_index);
+    vector<string> right_cmd(args.begin() + pipe_index + 1, args.end());
+
+      if (left_cmd.empty() || right_cmd.empty()) {
+        continue;
+    }
+    
+    int fd[2];
+    pipe(fd);
+
+    bool left_is_builtin = (left_cmd[0] == "echo" || left_cmd[0] == "type" || 
+                           left_cmd[0] == "pwd" || left_cmd[0] == "cd");
+    bool right_is_builtin = (right_cmd[0] == "echo" || right_cmd[0] == "type" || 
+                            right_cmd[0] == "pwd" || right_cmd[0] == "cd");
+
+    // Left command (writes to pipe)
+    pid_t pid1 = fork();
+    if(pid1 == 0){
+        dup2(fd[1], STDOUT_FILENO);
+        close(fd[0]);
+        close(fd[1]);
+
+        if(left_is_builtin){
+            if(left_cmd[0] == "echo"){
+                for(size_t i=1; i<left_cmd.size(); i++){
+                    cout << left_cmd[i];
+                    if(i+1 < left_cmd.size()) cout << " ";
+                }
+                cout << "\n";
+                _exit(0);
+            } else if(left_cmd[0] == "pwd"){
+                cout << filesystem::current_path().string() << "\n";
+                _exit(0);
+            }
+            _exit(0);
+        } else {
+            vector<char*> cargs = to_char_array(left_cmd);
+            execvp(cargs[0], cargs.data());
+            _exit(1);
+        }
+    } // CRITICAL: Close pid1==0 block here
+
+    // Right command (reads from pipe) - runs in parent, not inside pid1
+    pid_t pid2 = fork();
+    if(pid2 == 0){
+        dup2(fd[0], STDIN_FILENO);
+        close(fd[1]);
+        close(fd[0]);
+
+        if(right_is_builtin){
+            if(right_cmd[0] == "type"){
+                string cmd = (right_cmd.size() >= 2 ? right_cmd[1] : "");
+                
+                if(cmd == "exit" || cmd == "echo" || cmd == "type" || 
+                   cmd == "pwd" || cmd == "cd"){
+                    cout << cmd << " is a shell builtin\n";
+                } else {
+                    char* path_env = getenv("PATH");
+                    bool found = false;
+                    if(path_env){
+                        vector<string> paths = split_path(path_env);
+                        for(const string& dir : paths){
+                            string full_path = dir + "/" + cmd;
+                            if(is_executable(full_path)){
+                                cout << cmd << " is " << full_path << "\n";
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                    if(!found){
+                        cout << cmd << ": not found\n";
+                    }
+                }
+                _exit(0);
+            } else if(right_cmd[0] == "echo"){
+                for(size_t i=1; i<right_cmd.size(); i++){
+                    cout << right_cmd[i];
+                    if(i+1 < right_cmd.size()) cout << " ";
+                }
+                cout << "\n";
+                _exit(0);
+            }
+            _exit(0);
+        } else {
+            vector<char*> cargs = to_char_array(right_cmd);
+            execvp(cargs[0], cargs.data());
+            _exit(1);
+        }
+    } // Close pid2==0 block
+
+    // Parent process: close pipe ends and wait for both children
+    close(fd[0]);
+    close(fd[1]);
+    waitpid(pid1, nullptr, 0);
+    waitpid(pid2, nullptr, 0);
+
+    continue;
+}
+
+
 
         if (args.empty())
             continue;
