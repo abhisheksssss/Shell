@@ -12,7 +12,7 @@
 #include<readline/readline.h>
 #include<readline/history.h>
 #include<cstring>
-#include <dirent.h>
+#include<dirent.h>
 
 using namespace std;
 
@@ -453,108 +453,125 @@ int main()
 
 
 
-        if(has_pipe){
-    vector<string> left_cmd(args.begin(), args.begin()+pipe_index);
-    vector<string> right_cmd(args.begin() + pipe_index + 1, args.end());
+   if(has_pipe) {
+    // Split command into stages
+    vector<vector<string>> commands;
+    vector<string> current_cmd;
+    
+    for(size_t i = 0; i < args.size(); i++) {
+        if(args[i] == "|") {
+            if(!current_cmd.empty()) {
+                commands.push_back(current_cmd);
+                current_cmd.clear();
+            }
+        } else {
+            current_cmd.push_back(args[i]);
+        }
+    }
 
-      if (left_cmd.empty() || right_cmd.empty()) {
-        continue;
+    if(!current_cmd.empty()) {
+        commands.push_back(current_cmd);
     }
     
-    int fd[2];
-    pipe(fd);
-
-    bool left_is_builtin = (left_cmd[0] == "echo" || left_cmd[0] == "type" || 
-                           left_cmd[0] == "pwd" || left_cmd[0] == "cd");
-    bool right_is_builtin = (right_cmd[0] == "echo" || right_cmd[0] == "type" || 
-                            right_cmd[0] == "pwd" || right_cmd[0] == "cd");
-
-    // Left command (writes to pipe)
-    pid_t pid1 = fork();
-    if(pid1 == 0){
-        dup2(fd[1], STDOUT_FILENO);
-        close(fd[0]);
-        close(fd[1]);
-
-        if(left_is_builtin){
-            if(left_cmd[0] == "echo"){
-                for(size_t i=1; i<left_cmd.size(); i++){
-                    cout << left_cmd[i];
-                    if(i+1 < left_cmd.size()) cout << " ";
+    int num_commands = commands.size();
+    int num_pipes = num_commands - 1;
+    
+    // Create all pipes
+    int pipes[num_pipes][2];
+    for(int i = 0; i < num_pipes; i++) {
+        if(pipe(pipes[i]) < 0) {
+            perror("pipe");
+            continue;
+        }
+    }
+    
+    // Fork and execute each command
+    vector<pid_t> pids;
+    for(int i = 0; i < num_commands; i++) {
+        pid_t pid = fork();
+        
+        if(pid == 0) {  // Child process
+            // Redirect stdin from previous pipe (except first command)
+            if(i > 0) {
+                dup2(pipes[i-1][0], STDIN_FILENO);
+            }
+            
+            // Redirect stdout to next pipe (except last command)
+            if(i < num_commands - 1) {
+                dup2(pipes[i][1], STDOUT_FILENO);
+            }
+            
+            // Close all pipe file descriptors
+            for(int j = 0; j < num_pipes; j++) {
+                close(pipes[j][0]);
+                close(pipes[j][1]);
+            }
+            if(commands[i][0] == "echo") {
+                for(size_t k = 1; k < commands[i].size(); k++) {
+                    cout << commands[i][k];
+                    if(k + 1 < commands[i].size()) cout << " ";
                 }
                 cout << "\n";
                 _exit(0);
-            } else if(left_cmd[0] == "pwd"){
+            }
+            else if(commands[i][0] == "pwd") {
                 cout << filesystem::current_path().string() << "\n";
                 _exit(0);
             }
-            _exit(0);
-        } else {
-            vector<char*> cargs = to_char_array(left_cmd);
-            execvp(cargs[0], cargs.data());
-            _exit(1);
-        }
-    } // CRITICAL: Close pid1==0 block here
-
-    // Right command (reads from pipe) - runs in parent, not inside pid1
-    pid_t pid2 = fork();
-    if(pid2 == 0){
-        dup2(fd[0], STDIN_FILENO);
-        close(fd[1]);
-        close(fd[0]);
-
-        if(right_is_builtin){
-            if(right_cmd[0] == "type"){
-                string cmd = (right_cmd.size() >= 2 ? right_cmd[1] : "");
+            else if(commands[i][0] == "type") {
+                string cmd = (commands[i].size() >= 2 ? commands[i][1] : "");
                 
                 if(cmd == "exit" || cmd == "echo" || cmd == "type" || 
-                   cmd == "pwd" || cmd == "cd"){
+                   cmd == "pwd" || cmd == "cd") {
                     cout << cmd << " is a shell builtin\n";
                 } else {
                     char* path_env = getenv("PATH");
                     bool found = false;
-                    if(path_env){
+                    if(path_env) {
                         vector<string> paths = split_path(path_env);
-                        for(const string& dir : paths){
+                        for(const string& dir : paths) {
                             string full_path = dir + "/" + cmd;
-                            if(is_executable(full_path)){
+                            if(is_executable(full_path)) {
                                 cout << cmd << " is " << full_path << "\n";
                                 found = true;
                                 break;
                             }
                         }
                     }
-                    if(!found){
+                    if(!found) {
                         cout << cmd << ": not found\n";
                     }
                 }
                 _exit(0);
-            } else if(right_cmd[0] == "echo"){
-                for(size_t i=1; i<right_cmd.size(); i++){
-                    cout << right_cmd[i];
-                    if(i+1 < right_cmd.size()) cout << " ";
-                }
-                cout << "\n";
-                _exit(0);
             }
-            _exit(0);
-        } else {
-            vector<char*> cargs = to_char_array(right_cmd);
+
+            // Execute command (handle builtins if needed)
+            vector<char*> cargs = to_char_array(commands[i]);
             execvp(cargs[0], cargs.data());
-            _exit(1);
+            cerr << commands[i][0] << ": command not found\n";
+            _exit(127);
+        } else if(pid > 0) {
+            pids.push_back(pid);
         }
-    } // Close pid2==0 block
+    }
+    
+    // Parent: close all pipes
+    for(int i = 0; i < num_pipes; i++) {
+        close(pipes[i][0]);
+        close(pipes[i][1]);
+    }
 
-    // Parent process: close pipe ends and wait for both children
-    close(fd[0]);
-    close(fd[1]);
-    waitpid(pid1, nullptr, 0);
-    waitpid(pid2, nullptr, 0);
 
+    
+    
+    // Wait for all children
+    for(pid_t pid : pids) {
+        waitpid(pid, nullptr, 0);
+    }
+    
     continue;
-}
 
-
+   }
 
         if (args.empty())
             continue;
