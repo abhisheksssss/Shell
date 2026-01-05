@@ -12,7 +12,7 @@
 #include<readline/readline.h>
 #include<readline/history.h>
 #include<cstring>
-#include <dirent.h>
+#include<dirent.h>
 
 using namespace std;
 
@@ -468,6 +468,7 @@ int main()
             current_cmd.push_back(args[i]);
         }
     }
+
     if(!current_cmd.empty()) {
         commands.push_back(current_cmd);
     }
@@ -505,7 +506,45 @@ int main()
                 close(pipes[j][0]);
                 close(pipes[j][1]);
             }
-            
+            if(commands[i][0] == "echo") {
+                for(size_t k = 1; k < commands[i].size(); k++) {
+                    cout << commands[i][k];
+                    if(k + 1 < commands[i].size()) cout << " ";
+                }
+                cout << "\n";
+                _exit(0);
+            }
+            else if(commands[i][0] == "pwd") {
+                cout << filesystem::current_path().string() << "\n";
+                _exit(0);
+            }
+            else if(commands[i][0] == "type") {
+                string cmd = (commands[i].size() >= 2 ? commands[i][1] : "");
+                
+                if(cmd == "exit" || cmd == "echo" || cmd == "type" || 
+                   cmd == "pwd" || cmd == "cd") {
+                    cout << cmd << " is a shell builtin\n";
+                } else {
+                    char* path_env = getenv("PATH");
+                    bool found = false;
+                    if(path_env) {
+                        vector<string> paths = split_path(path_env);
+                        for(const string& dir : paths) {
+                            string full_path = dir + "/" + cmd;
+                            if(is_executable(full_path)) {
+                                cout << cmd << " is " << full_path << "\n";
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                    if(!found) {
+                        cout << cmd << ": not found\n";
+                    }
+                }
+                _exit(0);
+            }
+
             // Execute command (handle builtins if needed)
             vector<char*> cargs = to_char_array(commands[i]);
             execvp(cargs[0], cargs.data());
@@ -521,6 +560,9 @@ int main()
         close(pipes[i][0]);
         close(pipes[i][1]);
     }
+
+
+    
     
     // Wait for all children
     for(pid_t pid : pids) {
