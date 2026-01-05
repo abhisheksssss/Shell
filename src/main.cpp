@@ -529,7 +529,7 @@ int main()
     
     continue;
 
-
+   }
 
         if (args.empty())
             continue;
