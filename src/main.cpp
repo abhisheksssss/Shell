@@ -453,74 +453,81 @@ int main()
 
 
 
-        if(has_pipe){
-     vector<vector<string>>command;
-     vector<string>current_cmd;
-
-     for(size_t i=0; i<args.size();i++){
-        if(args[i]=="|"){
-            if(!current_cmd.empty()){
-                command.push_back(current_cmd);
+   if(has_pipe) {
+    // Split command into stages
+    vector<vector<string>> commands;
+    vector<string> current_cmd;
+    
+    for(size_t i = 0; i < args.size(); i++) {
+        if(args[i] == "|") {
+            if(!current_cmd.empty()) {
+                commands.push_back(current_cmd);
                 current_cmd.clear();
             }
-        }else{
-            current_cmd.push(args[i];)
+        } else {
+            current_cmd.push_back(args[i]);
         }
-     }
-
-     if(!current_cmd.empty()){
-        command.push_back(current_cmd);
-     }
-
-     int num_commands=commands.size();
-     int num_pipes=num_commands-1;
- 
-     int pipes[nums_pipes][2];
-     for(int i=0;i<num_pipes;i++){
-        if(pipe(pipes[i])<0)[
+    }
+    if(!current_cmd.empty()) {
+        commands.push_back(current_cmd);
+    }
+    
+    int num_commands = commands.size();
+    int num_pipes = num_commands - 1;
+    
+    // Create all pipes
+    int pipes[num_pipes][2];
+    for(int i = 0; i < num_pipes; i++) {
+        if(pipe(pipes[i]) < 0) {
             perror("pipe");
             continue;
-        ]
-     }
-
-     vector<pid_t>pids;   //this store the process id of child 
-
-     for(int i=0;i<num_commands;i++){
+        }
+    }
+    
+    // Fork and execute each command
+    vector<pid_t> pids;
+    for(int i = 0; i < num_commands; i++) {
+        pid_t pid = fork();
         
-        pid_t pid=fork();
-
-        if(pid==0){
-            if(i>0){
-                dup2(pipes[i-1][0],STDIN_FILENO);
+        if(pid == 0) {  // Child process
+            // Redirect stdin from previous pipe (except first command)
+            if(i > 0) {
+                dup2(pipes[i-1][0], STDIN_FILENO);
             }
-            if(i<num_commands-1){
-                dup2(pipes[i][1],STDOUT_FILENO);
+            
+            // Redirect stdout to next pipe (except last command)
+            if(i < num_commands - 1) {
+                dup2(pipes[i][1], STDOUT_FILENO);
             }
-            for(int j=0;j<num_pipes;j++){
+            
+            // Close all pipe file descriptors
+            for(int j = 0; j < num_pipes; j++) {
                 close(pipes[j][0]);
                 close(pipes[j][1]);
             }
-
-           vector<char*> cargs=to_char_array(command[i]);
-           execvp(cargs[0],cargs.data());
-           cerr<<commands[i][0]<<": command not found \n";
-           _exit(127);
-        }else if (pid>0){
+            
+            // Execute command (handle builtins if needed)
+            vector<char*> cargs = to_char_array(commands[i]);
+            execvp(cargs[0], cargs.data());
+            cerr << commands[i][0] << ": command not found\n";
+            _exit(127);
+        } else if(pid > 0) {
             pids.push_back(pid);
         }
     }
-
-    for(int i=0;i<num_pipes;i++){
+    
+    // Parent: close all pipes
+    for(int i = 0; i < num_pipes; i++) {
         close(pipes[i][0]);
         close(pipes[i][1]);
     }
-
-    for(pid_t pid:pids){
-        waitpid(pid,nullptr,0);
+    
+    // Wait for all children
+    for(pid_t pid : pids) {
+        waitpid(pid, nullptr, 0);
     }
     
     continue;
-}
 
 
 
