@@ -420,7 +420,7 @@ int main()
             continue;
         }
        history.push_back(input);
-       
+
 
         string outfile;
         string errfile;
@@ -662,7 +662,7 @@ int main()
         {
             string cmd = (args.size() >= 2 ? args[1] : "");
 
-            if (cmd == "exit" || cmd == "echo" || cmd == "type" || cmd == "pwd" || cmd == "cd")
+            if (cmd == "exit" || cmd == "echo" || cmd == "type" || cmd == "pwd" || cmd == "cd"||cmd=="history")
             {
                 cout << cmd << " is a shell builtin\n";
                 continue;
