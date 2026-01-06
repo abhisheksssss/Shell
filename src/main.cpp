@@ -412,6 +412,14 @@ int main()
 
           
     
+                if(args[0]=="history"){
+            cout<<"We are inside "<<endl;
+            cout<<history.size()<<endl;
+            for(int i=0;i<history.size();i++){
+                cout<<i+1<<" "<<history[i]<<endl;
+            }
+            continue;
+        }
 
 
         string outfile;
@@ -678,14 +686,6 @@ int main()
                 }
             }
 
-                if(args[0]=="history"){
-            cout<<"We are inside "<<endl;
-            cout<<history.size()<<endl;
-            for(int i=0;i<history.size();i++){
-                cout<<i+1<<" "<<history[i]<<endl;
-            }
-            continue;
-        }
         
         if(found){
             history.push_back(input);
