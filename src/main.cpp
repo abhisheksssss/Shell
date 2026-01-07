@@ -1,10 +1,19 @@
+
+
+
 #include <iostream>
 #include <string>
 #include <vector>
 #include <cstdlib>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
+#ifdef _WIN32
+    #include <windows.h>
+    // Windows-specific code
+#else
+    #include <sys/wait.h>
+    // POSIX code
+#endif
 #include <filesystem>
 #include <sstream>
 #include <fstream>
@@ -381,6 +390,7 @@ int main()
     rl_attempted_completion_function = command_completion;
 
      char* input_buffer;
+     vector<string>history;
 
     while ((input_buffer=readline("$ "))!=nullptr)
     {
@@ -399,6 +409,15 @@ int main()
         bool err_append=false;
         bool has_pipe=false;
         size_t pipe_index=0;
+
+          
+    
+                if(args[0]=="history"){
+            for(int i=0;i<history.size();i++){
+                cout<<i+1<<" "<<history[i]<<endl;
+            }
+            continue;
+        }
 
 
         string outfile;
@@ -641,7 +660,7 @@ int main()
         {
             string cmd = (args.size() >= 2 ? args[1] : "");
 
-            if (cmd == "exit" || cmd == "echo" || cmd == "type" || cmd == "pwd" || cmd == "cd")
+            if (cmd == "exit" || cmd == "echo" || cmd == "type" || cmd == "pwd" || cmd == "cd"||cmd=="history")
             {
                 cout << cmd << " is a shell builtin\n";
                 continue;
@@ -664,6 +683,14 @@ int main()
                     }
                 }
             }
+
+        
+        if(found){
+            history.push_back(input);
+        }else{
+            string his="invalid command";
+            history.push_back(his);
+        }
 
             if (!found)
                 cout << cmd << ": not found\n";
