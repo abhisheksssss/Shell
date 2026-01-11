@@ -1,6 +1,3 @@
-
-
-
 #include <iostream>
 #include <string>
 #include <vector>
@@ -22,6 +19,7 @@
 #include<readline/history.h>
 #include<cstring>
 #include<dirent.h>
+#include <iomanip> 
 
 using namespace std;
 
@@ -29,7 +27,7 @@ bool is_executable(const string &path);
 vector<string> split_path(const string &path);
 
 
-const char* builtin_command[]={"echo","exit",nullptr};
+const char* builtin_command[]={"echo","exit","history",nullptr};
 
 
 char* command_generator(const char* text, int state) {
@@ -397,6 +395,11 @@ int main()
         string input(input_buffer);
         free(input_buffer);
 
+          // Read input
+              history.push_back(input);
+    
+              
+
         if (input.empty())
             continue;
 
@@ -411,11 +414,14 @@ int main()
         size_t pipe_index=0;
 
           
-    
-                if(args[0]=="history"){
-            for(int i=0;i<history.size();i++){
-                cout<<i+1<<" "<<history[i]<<endl;
+        if (!args.empty() && args[0] == "history") {
+            // Print history with proper formatting
+            for(size_t i = 0; i < history.size(); i++) {
+                // Format: 4 spaces, 4-digit right-aligned index, 2 spaces, command
+                cout << "    " << setw(4) << right << (i + 1) << "  " << history[i] << endl;
             }
+            // CRITICAL: Flush output and continue without printing prompt
+            cout << flush;
             continue;
         }
 
@@ -541,7 +547,7 @@ int main()
                 string cmd = (commands[i].size() >= 2 ? commands[i][1] : "");
                 
                 if(cmd == "exit" || cmd == "echo" || cmd == "type" || 
-                   cmd == "pwd" || cmd == "cd") {
+                   cmd == "pwd" || cmd == "cd"|| cmd=="history") {
                     cout << cmd << " is a shell builtin\n";
                 } else {
                     char* path_env = getenv("PATH");
