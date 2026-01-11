@@ -408,13 +408,13 @@ int main()
         size_t pipe_index=0;
 
           
-    
-                if(args[0]=="history"){
-            for(int i=0;i<history.size();i++){
-                cout<<"    "<<i+1<<" "<<history[i]<<endl;
-            }
-            continue;
-        }
+    if(args[0] == "history") {
+    for(size_t i = 0; i < history.size(); i++) {
+        // Format with 4 spaces and right-aligned index
+        cout << "    " << setw(4) << right << (i + 1) << "  " << history[i] << endl;
+    }
+    continue;
+}
 
 
         string outfile;
