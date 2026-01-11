@@ -1,6 +1,3 @@
-
-
-
 #include <iostream>
 #include <string>
 #include <vector>
@@ -414,7 +411,7 @@ int main()
     
                 if(args[0]=="history"){
             for(int i=0;i<history.size();i++){
-                cout<<i+1<<" "<<history[i]<<endl;
+                cout<<"    "<<i+1<<" "<<history[i]<<endl;
             }
             continue;
         }
