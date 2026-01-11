@@ -27,7 +27,7 @@ bool is_executable(const string &path);
 vector<string> split_path(const string &path);
 
 
-const char* builtin_command[]={"echo","exit",nullptr};
+const char* builtin_command[]={"echo","exit","history",nullptr};
 
 
 char* command_generator(const char* text, int state) {
@@ -396,9 +396,9 @@ int main()
         free(input_buffer);
 
           // Read input
-        if (!getline(cin, input_buffer)) {
-            break;  // EOF reached (tester sends EOF)
-        }
+              history.push_back(input);
+    
+              
 
         if (input.empty())
             continue;
@@ -547,7 +547,7 @@ int main()
                 string cmd = (commands[i].size() >= 2 ? commands[i][1] : "");
                 
                 if(cmd == "exit" || cmd == "echo" || cmd == "type" || 
-                   cmd == "pwd" || cmd == "cd") {
+                   cmd == "pwd" || cmd == "cd"|| cmd=="history") {
                     cout << cmd << " is a shell builtin\n";
                 } else {
                     char* path_env = getenv("PATH");
