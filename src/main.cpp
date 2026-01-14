@@ -381,6 +381,19 @@ void run_external(vector<string> &args, bool redirect_out, const string &outfile
     }
 }
 
+bool isNumeric(string s){
+    if(s.empty()){
+        return false;
+    }
+    for(char c:s){
+        if(!isdigit(c)){
+            return false;
+        }
+    }
+
+    return true;
+}
+
 int main()
 {
     cout << unitbuf;
@@ -417,14 +430,13 @@ int main()
         if (!args.empty() && args[0] == "history") {
             // Print history with proper formatting
   
-        if(args[1]){
+        if(isNumeric(args[1])){
             for(size_t i=args[1]; i<history.size();j++){
                 cout << "    " << setw(4) << right << (i + 1) << "  " << history[i] << endl;
             }
             cout << flush;
             continue;
         }
-                  
       
             for(size_t i = 0; i < history.size(); i++) {
                 // Format: 4 spaces, 4-digit right-aligned index, 2 spaces, command
