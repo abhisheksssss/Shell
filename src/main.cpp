@@ -390,9 +390,10 @@ int main()
             // Print history with proper formatting
   
             if(args.size() > 1 && isNumeric(args[1])){
-                int start_idx = stoi(args[1]);
+                int n = stoi(args[1]);
+                int start_idx = (int)history.size() - n;
                 if (start_idx < 0) start_idx = 0;
-                for(size_t i=(size_t)start_idx; i<history.size(); i++){ // Fixed j -> i and string -> int
+                for(size_t i=(size_t)start_idx; i<history.size(); i++){
                     cout << "    " << setw(4) << right << (i + 1) << "  " << history[i] << endl;
                 }
                 cout << flush;
