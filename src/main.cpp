@@ -16,360 +16,143 @@
 #include <sstream>
 #include <fstream>
 #include <fcntl.h>
+#ifndef _WIN32
+    #include <readline/readline.h>
+    #include <readline/history.h>
+#endif
 #include<cstring>
 #include<dirent.h>
 #include <iomanip> 
 
 using namespace std;
 
-bool is_executable(const string &path);
-vector<string> split_path(const string &path);
+// ... (existing code)
 
+#ifndef _WIN32
+char* command_generator(const char* text, int state) {
+    static int list_index, len;
+    static vector<string> path_dirs;
+    static size_t path_index;
+    static DIR* dir_handle;
+    static string current_dir;
+    const char* name;
 
-const char* builtin_command[]={"echo","exit","history",nullptr};
+    // First call: initialize
+    if (!state) {
+        list_index = 0;
+        len = strlen(text);
+        path_index = 0;
+        dir_handle = nullptr;
+        current_dir.clear();
+        
+        // Get PATH directories
+        path_dirs.clear();
+        char* path_env = getenv("PATH");
+        if (path_env) {
+            path_dirs = split_path(path_env);
+        }
+    }
 
-// Removed command_generator and command_completion as they depended on readline
+    // First, check builtin commands
+    while ((name = builtin_command[list_index])) {
+        list_index++;
+        if (strncmp(name, text, len) == 0) {
+            return strdup(name);
+        }
+    }
 
-bool is_executable(const string &path)
-{
-    return access(path.c_str(), X_OK) == 0;
+    // Then search through PATH directories for executables
+    while (path_index < path_dirs.size()) {
+        // Open the next directory if needed
+        if (dir_handle == nullptr) {
+            current_dir = path_dirs[path_index];
+            path_index++;
+            
+            // Skip non-existent directories
+            dir_handle = opendir(current_dir.c_str());
+            if (dir_handle == nullptr) {
+                continue;
+            }
+        }
+
+        // Read entries from current directory
+        struct dirent* entry;
+        while ((entry = readdir(dir_handle)) != nullptr) {
+            // Skip hidden files and directories
+            if (entry->d_name[0] == '.') {
+                continue;
+            }
+
+            // Check if name matches prefix
+            if (strncmp(entry->d_name, text, len) == 0) {
+                // Check if file is executable
+                string full_path = current_dir + "/" + entry->d_name;
+                if (is_executable(full_path)) {
+                    // Return this match (keep dir_handle open for next call)
+                    return strdup(entry->d_name);
+                }
+            }
+        }
+
+        // Finished with this directory
+        closedir(dir_handle);
+        dir_handle = nullptr;
+    }
+
+    return nullptr;
 }
 
-vector<string> split_path(const string &path)
-{
-    vector<string> dirs;
-    stringstream ss(path);
-    string item;
-    while (getline(ss, item, ':'))
-    {
-        dirs.push_back(item);
-    }
-    return dirs;
-}
-
-vector<string> split_args(const string &input)
-{
-    vector<string> args;
-    string current;
-    bool in_single_quote = false;
-    bool in_double_quote = false;
-
-    for (size_t i = 0; i < input.size(); i++)
-    {
-        char c = input[i];
-        // NEW: tokenize stdout redirection operators when not inside quotes. [web:60]
-        if (!in_single_quote && !in_double_quote)
-        {
-              //1>>
-            if (c == '1' && i + 2 < input.size() && input[i + 1] == '>' && input[i + 2] == '>')
-            {
-                if (!current.empty())
-                {
-                    args.push_back(current);
-                    current.clear();
-                }
-                args.push_back("1>>");
-                i += 2;
-                continue;
-            }
-
-            // 2>>
-              if (c == '2' && i + 2 < input.size() &&
-        input[i + 1] == '>' && input[i + 2] == '>') {
-
-        if (!current.empty()) {
-            args.push_back(current);
-            current.clear();
-        }
-        args.push_back("2>>");
-        i += 2;
-        continue;
-    }
-
-            if (c == '>' && i + 1 < input.size() && input[i + 1] == '>')
-            {
-                if (!current.empty())
-                {
-                    args.push_back(current);
-                    current.clear();
-                }
-                args.push_back(">>");
-                i++;
-                continue;
-            }
-
-            if (c == '1' && i + 1 < input.size() && input[i + 1] == '>')
-            {
-                if (!current.empty())
-                {
-                    args.push_back(current);
-                    current.clear();
-                }
-                args.push_back("1>");
-                i++; // consume '>'
-                continue;
-            }
-            if (c == '2' && i + 1 < input.size() && input[i + 1] == '>')
-            {
-                if (!current.empty())
-                {
-                    args.push_back(current);
-                    current.clear();
-                }
-                args.push_back("2>");
-                i++;
-                continue;
-            }
-            if (c == '>')
-            {
-                if (!current.empty())
-                {
-                    args.push_back(current);
-                    current.clear();
-                }
-                args.push_back(">");
-                continue;
-            }
-        }
-
-        /* Backslash handling (kept) */
-        if (c == '\\')
-        {
-            if (!in_single_quote && !in_double_quote)
-            {
-                if (i + 1 < input.size())
-                {
-                    current += input[i + 1];
-                    i++;
-                }
-                continue;
-            }
-
-            if (in_double_quote)
-            {
-                if (i + 1 < input.size())
-                {
-                    char next = input[i + 1];
-                    if (next == '"' || next == '\\')
-                    {
-                        current += next;
-                        i++;
-                    }
-                    else
-                    {
-                        current += '\\';
-                    }
-                }
-                continue;
-            }
-
-            current += '\\';
-            continue;
-        }
-
-        if (c == '\'' && !in_double_quote)
-        {
-            in_single_quote = !in_single_quote;
-            continue;
-        }
-
-        if (c == '"' && !in_single_quote)
-        {
-            in_double_quote = !in_double_quote;
-            continue;
-        }
-
-        if ((c == ' ' || c == '\t') && !in_single_quote && !in_double_quote)
-        {
-            if (!current.empty())
-            {
-                args.push_back(current);
-                current.clear();
-            }
-        }
-        else
-        {
-            current += c;
-        }
-    }
-
-    if (!current.empty())
-        args.push_back(current);
-    return args;
-}
-
-vector<char *> to_char_array(vector<string> &args)
-{
-    vector<char *> result;
-    for (auto &arg : args)
-        result.push_back(const_cast<char *>(arg.c_str()));
-    result.push_back(nullptr);
-    return result;
-}
-
-// Needed so echo (builtin) can redirect stdout in the shell process. [web:21]
-struct StdoutRedirect
-{
-    int saved = -1;
-    bool active = false;
-
-    StdoutRedirect(bool enable, const string &outfile, bool append)
-    {
-        if (!enable)
-            return;
-
-        saved = dup(STDOUT_FILENO);
-        if (saved < 0)
-        {
-            perror("dup");
-            return;
-        }
-
-        int fd = open(outfile.c_str(), O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC), 0644);
-        if (fd < 0)
-        {
-            perror("open");
-            close(saved);
-            saved = -1;
-            return;
-        }
-
-        if (dup2(fd, STDOUT_FILENO) < 0)
-        {
-            perror("dup2");
-            close(fd);
-            close(saved);
-            saved = -1;
-            return;
-        }
-        close(fd);
-        active = true;
-    }
-
-    ~StdoutRedirect()
-    {
-        if (!active)
-            return;
-        dup2(saved, STDOUT_FILENO);
-        close(saved);
-    }
-};
-
-// External redirection: open + dup2 before execvp in child. [web:22]
-void run_external(vector<string> &args, bool redirect_out, const string &outfile, bool append, bool redirect_err, const string &errfile,bool err_append)
-{
-#ifdef _WIN32
-    int stdout_saved = -1;
-    int stderr_saved = -1;
-
-    if (redirect_out) {
-        stdout_saved = dup(STDOUT_FILENO);
-        int flags = O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC);
-        int fd = open(outfile.c_str(), flags, 0644);
-        if (fd >= 0) {
-            dup2(fd, STDOUT_FILENO);
-            close(fd);
-        }
+char** command_completion(const char* text, int start, int end){
+    rl_attempted_completion_over = 1; 
+    
+    if(start == 0){
+        return rl_completion_matches(text, command_generator);
     }
     
-    if (redirect_err) {
-        stderr_saved = dup(STDERR_FILENO);
-        int flags = O_WRONLY | O_CREAT | (err_append ? O_APPEND : O_TRUNC);
-        int fd = open(errfile.c_str(), flags, 0644);
-        if (fd >= 0) {
-            dup2(fd, STDERR_FILENO);
-            close(fd);
-        }
-    }
-
-    vector<char *> c_args = to_char_array(args);
-    // _spawnvp is the Windows equivalent of fork + exec
-    intptr_t ret = _spawnvp(_P_WAIT, c_args[0], c_args.data());
-
-    if (stdout_saved != -1) {
-        dup2(stdout_saved, STDOUT_FILENO);
-        close(stdout_saved);
-    }
-    if (stderr_saved != -1) {
-        dup2(stderr_saved, STDERR_FILENO);
-        close(stderr_saved);
-    }
-
-    if (ret == -1) {
-        cerr << args[0] << ": command not found\n";
-    }
-#else
-    pid_t pid = fork();
-    if (pid == 0)
-    {
-        if (redirect_out)
-        {
-            int flags = O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC);
-            int fd = open(outfile.c_str(), flags, 0644);
-            if (fd < 0)
-                _exit(1);
-            dup2(fd, STDOUT_FILENO);
-            close(fd);
-        }
-        if (redirect_err)
-        {
-              int flags = O_WRONLY | O_CREAT | (err_append ? O_APPEND : O_TRUNC);
-    int fd = open(errfile.c_str(), flags, 0644);
-    if (fd < 0) _exit(1);
-    dup2(fd, STDERR_FILENO);
-    close(fd);
-        }
-
-        vector<char *> c_args = to_char_array(args);
-        execvp(c_args[0], c_args.data());
-        cerr << args[0] << ": command not found\n";
-        _exit(127);
-    }
-    else if (pid > 0)
-    {
-        waitpid(pid, nullptr, 0);
-    }
-    else
-    {
-        perror("fork");
-    }
+    return nullptr;
+}
 #endif
-}
 
-bool isNumeric(string s){
-    if(s.empty()){
-        return false;
-    }
-    for(char c:s){
-        if(!isdigit(c)){
-            return false;
-        }
-    }
-
-    return true;
-}
+// ... (omitted)
 
 int main()
 {
     cout << unitbuf;
     cerr << unitbuf;
     
-    // Removed rl_attempted_completion_function assignment
+#ifndef _WIN32
+    rl_attempted_completion_function = command_completion;
+#endif
 
      string input;
      vector<string>history;
 
     while (true)
     {
+#ifdef _WIN32
         cout << "$ ";
         if (!getline(cin, input)) {
             break;
         }
-
-        // Read input
         if (!input.empty()) {
             history.push_back(input);
         }
+#else
+        char* input_buffer = readline("$ ");
+        if (!input_buffer) {
+            break;
+        }
+        input = string(input_buffer);
+        free(input_buffer);
+        if (!input.empty()) {
+            add_history(input.c_str());
+            history.push_back(input);
+        }
+#endif
+
+        if (input.empty())
+            continue;
+// ...
               
 
         if (input.empty())
