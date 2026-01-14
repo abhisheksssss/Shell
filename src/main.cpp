@@ -6,7 +6,8 @@
 #include <sys/stat.h>
 #ifdef _WIN32
     #include <windows.h>
-    // Windows-specific code
+    #include <process.h>
+    #define pid_t intptr_t
 #else
     #include <sys/wait.h>
     // POSIX code
@@ -15,8 +16,6 @@
 #include <sstream>
 #include <fstream>
 #include <fcntl.h>
-#include<readline/readline.h>
-#include<readline/history.h>
 #include<cstring>
 #include<dirent.h>
 #include <iomanip> 
@@ -29,92 +28,7 @@ vector<string> split_path(const string &path);
 
 const char* builtin_command[]={"echo","exit","history",nullptr};
 
-
-char* command_generator(const char* text, int state) {
-    static int list_index, len;
-    static vector<string> path_dirs;
-    static size_t path_index;
-    static DIR* dir_handle;
-    static string current_dir;
-    const char* name;
-
-    // First call: initialize
-    if (!state) {
-        list_index = 0;
-        len = strlen(text);
-        path_index = 0;
-        dir_handle = nullptr;
-        current_dir.clear();
-        
-        // Get PATH directories
-        path_dirs.clear();
-        char* path_env = getenv("PATH");
-        if (path_env) {
-            path_dirs = split_path(path_env);
-        }
-    }
-
-    // First, check builtin commands
-    while ((name = builtin_command[list_index])) {
-        list_index++;
-        if (strncmp(name, text, len) == 0) {
-            return strdup(name);
-        }
-    }
-
-    // Then search through PATH directories for executables
-    while (path_index < path_dirs.size()) {
-        // Open the next directory if needed
-        if (dir_handle == nullptr) {
-            current_dir = path_dirs[path_index];
-            path_index++;
-            
-            // Skip non-existent directories
-            dir_handle = opendir(current_dir.c_str());
-            if (dir_handle == nullptr) {
-                continue;
-            }
-        }
-
-        // Read entries from current directory
-        struct dirent* entry;
-        while ((entry = readdir(dir_handle)) != nullptr) {
-            // Skip hidden files and directories
-            if (entry->d_name[0] == '.') {
-                continue;
-            }
-
-            // Check if name matches prefix
-            if (strncmp(entry->d_name, text, len) == 0) {
-                // Check if file is executable
-                string full_path = current_dir + "/" + entry->d_name;
-                if (is_executable(full_path)) {
-                    // Return this match (keep dir_handle open for next call)
-                    return strdup(entry->d_name);
-                }
-            }
-        }
-
-        // Finished with this directory
-        closedir(dir_handle);
-        dir_handle = nullptr;
-    }
-
-    return nullptr;
-}
-
-
-char** command_completion(const char* text, int start, int end){
-    rl_attempted_completion_over = 1;  // Fixed: "rl" not "r1"
-    
-    if(start == 0){
-        return rl_completion_matches(text, command_generator);  // Fixed: correct function
-    }
-    
-    return nullptr;
-}
-
-
+// Removed command_generator and command_completion as they depended on readline
 
 bool is_executable(const string &path)
 {
@@ -344,7 +258,47 @@ struct StdoutRedirect
 // External redirection: open + dup2 before execvp in child. [web:22]
 void run_external(vector<string> &args, bool redirect_out, const string &outfile, bool append, bool redirect_err, const string &errfile,bool err_append)
 {
+#ifdef _WIN32
+    int stdout_saved = -1;
+    int stderr_saved = -1;
 
+    if (redirect_out) {
+        stdout_saved = dup(STDOUT_FILENO);
+        int flags = O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC);
+        int fd = open(outfile.c_str(), flags, 0644);
+        if (fd >= 0) {
+            dup2(fd, STDOUT_FILENO);
+            close(fd);
+        }
+    }
+    
+    if (redirect_err) {
+        stderr_saved = dup(STDERR_FILENO);
+        int flags = O_WRONLY | O_CREAT | (err_append ? O_APPEND : O_TRUNC);
+        int fd = open(errfile.c_str(), flags, 0644);
+        if (fd >= 0) {
+            dup2(fd, STDERR_FILENO);
+            close(fd);
+        }
+    }
+
+    vector<char *> c_args = to_char_array(args);
+    // _spawnvp is the Windows equivalent of fork + exec
+    intptr_t ret = _spawnvp(_P_WAIT, c_args[0], c_args.data());
+
+    if (stdout_saved != -1) {
+        dup2(stdout_saved, STDOUT_FILENO);
+        close(stdout_saved);
+    }
+    if (stderr_saved != -1) {
+        dup2(stderr_saved, STDERR_FILENO);
+        close(stderr_saved);
+    }
+
+    if (ret == -1) {
+        cerr << args[0] << ": command not found\n";
+    }
+#else
     pid_t pid = fork();
     if (pid == 0)
     {
@@ -379,6 +333,7 @@ void run_external(vector<string> &args, bool redirect_out, const string &outfile
     {
         perror("fork");
     }
+#endif
 }
 
 bool isNumeric(string s){
@@ -398,19 +353,23 @@ int main()
 {
     cout << unitbuf;
     cerr << unitbuf;
-    rl_attempted_completion_function = command_completion;
+    
+    // Removed rl_attempted_completion_function assignment
 
-     char* input_buffer;
+     string input;
      vector<string>history;
 
-    while ((input_buffer=readline("$ "))!=nullptr)
+    while (true)
     {
-        string input(input_buffer);
-        free(input_buffer);
+        cout << "$ ";
+        if (!getline(cin, input)) {
+            break;
+        }
 
-          // Read input
-              history.push_back(input);
-    
+        // Read input
+        if (!input.empty()) {
+            history.push_back(input);
+        }
               
 
         if (input.empty())
@@ -424,19 +383,21 @@ int main()
         bool append = false;
         bool err_append=false;
         bool has_pipe=false;
-        size_t pipe_index=0;
+        size_t pipe_index=0; // Keeping variable even if unused for now
 
           
         if (!args.empty() && args[0] == "history") {
             // Print history with proper formatting
   
-        if(isNumeric(args[1])){
-            for(size_t i=args[1]; i<history.size();j++){
-                cout << "    " << setw(4) << right << (i + 1) << "  " << history[i] << endl;
+            if(args.size() > 1 && isNumeric(args[1])){
+                int start_idx = stoi(args[1]);
+                if (start_idx < 0) start_idx = 0;
+                for(size_t i=(size_t)start_idx; i<history.size(); i++){ // Fixed j -> i and string -> int
+                    cout << "    " << setw(4) << right << (i + 1) << "  " << history[i] << endl;
+                }
+                cout << flush;
+                continue;
             }
-            cout << flush;
-            continue;
-        }
       
             for(size_t i = 0; i < history.size(); i++) {
                 // Format: 4 spaces, 4-digit right-aligned index, 2 spaces, command
@@ -500,6 +461,7 @@ int main()
 
 
 
+#ifndef _WIN32
    if(has_pipe) {
     // Split command into stages
     vector<vector<string>> commands;
@@ -619,6 +581,12 @@ int main()
     continue;
 
    }
+#else
+    if(has_pipe) {
+        cout << "Pipes not supported on Windows yet\n";
+        continue;
+    }
+#endif
 
         if (args.empty())
             continue;
