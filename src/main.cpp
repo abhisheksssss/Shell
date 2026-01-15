@@ -172,7 +172,7 @@ void run_external(vector<string>& args, bool redirect_out, const string& outfile
         StdoutRedirect r(redirect_out, outfile, append, redirect_err, errfile, err_append);
         vector<char*> c_args = to_char_array(args); // Create a non-const copy for execvp
         execvp(c_args[0], c_args.data());
-        perror(c_args[0]);
+        cout << c_args[0] << ": command not found" << endl;
         exit(1);
     } else if (pid > 0) {
         int status;
