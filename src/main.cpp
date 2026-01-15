@@ -24,20 +24,251 @@
 #include<dirent.h>
 #include <iomanip> 
 
-#include "utils/isNumeric.hpp"
-#include "utils/split_path.hpp"
-#include "utils/is_executable.hpp"
-#include "utils/split_args.hpp"
-#include "utils/to_char_array.hpp"
-#include "utils/StdoutRedirect.hpp"
-#include "utils/run_external.hpp"
-#include "utils/builtins.hpp"
+using namespace std;
+
+const char* builtin_command[] = {"exit", "echo", "type", "pwd", "cd", "history", nullptr};
+
+bool isNumeric(const string& str) {
+    if (str.empty()) return false;
+    for (char c : str) {
+        if (!isdigit(c)) return false;
+    }
+    return true;
+}
+
+vector<string> split_path(const string& env) {
+    vector<string> paths;
+    stringstream ss(env);
+    string item;
+#ifdef _WIN32
+    char delimiter = ';';
+#else
+    char delimiter = ':';
+#endif
+    while (getline(ss, item, delimiter)) {
+        if (!item.empty()) {
+            paths.push_back(item);
+        }
+    }
+    return paths;
+}
+
+bool is_executable(const string& path) {
+#ifdef _WIN32
+    DWORD attrs = GetFileAttributesA(path.c_str());
+    return (attrs != INVALID_FILE_ATTRIBUTES);
+#else
+    return access(path.c_str(), X_OK) == 0;
+#endif
+}
+
+vector<string> split_args(const string& input) {
+    vector<string> args;
+    string current;
+    bool in_quotes = false;
+    char quote_char = 0;
+    
+    for (size_t i = 0; i < input.length(); i++) {
+        char c = input[i];
+        if (c == '\\' && i + 1 < input.length() && !in_quotes) { // Handle escaped characters outside quotes
+            current += input[++i];
+        } 
+        else if ((c == '\'' || c == '"')) {
+            if (!in_quotes) {
+                in_quotes = true;
+                quote_char = c;
+            } else if (c == quote_char) {
+                if (i + 1 < input.length() && (input[i+1] == '\'' || input[i+1] == '"')) {
+                    // quote concatenation like "foo""bar" -> foobar
+                } else {
+                    in_quotes = false;
+                }
+            } else {
+                current += c;
+            }
+        } else if (c == ' ' && !in_quotes) {
+            if (!current.empty()) {
+                args.push_back(current);
+                current.clear();
+            }
+        } else {
+             if (in_quotes && c == '\\' && (i+1 < input.length()) && (input[i+1] == quote_char || input[i+1] == '\\')) {
+                current += input[++i];
+             } else {
+                current += c;
+             }
+        }
+    }
+    if (!current.empty()) args.push_back(current);
+    return args;
+}
+
+vector<char*> to_char_array(const vector<string>& args) {
+    vector<char*> result;
+    for (const auto& s : args) {
+        result.push_back(const_cast<char*>(s.c_str()));
+    }
+    result.push_back(nullptr);
+    return result;
+}
+
+class StdoutRedirect {
+    int original_stdout;
+    int original_stderr;
+    bool redirecting_out;
+    bool redirecting_err;
+
+public:
+    StdoutRedirect(bool redirect_out, const string& outfile, bool append, 
+                   bool redirect_err = false, const string& errfile = "", bool err_append = false) 
+        : original_stdout(-1), original_stderr(-1), redirecting_out(false), redirecting_err(false) {
+        
+        if (redirect_out) {
+            original_stdout = dup(STDOUT_FILENO);
+            int flags = O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC);
+            int fd = open(outfile.c_str(), flags, 0644);
+            if (fd >= 0) {
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
+                redirecting_out = true;
+            }
+        }
+
+        if (redirect_err) {
+            original_stderr = dup(STDERR_FILENO);
+            int flags = O_WRONLY | O_CREAT | (err_append ? O_APPEND : O_TRUNC);
+            int fd = open(errfile.c_str(), flags, 0644);
+            if (fd >= 0) {
+                dup2(fd, STDERR_FILENO);
+                close(fd);
+                redirecting_err = true;
+            }
+        }
+    }
+
+    ~StdoutRedirect() {
+        if (redirecting_out && original_stdout != -1) {
+            dup2(original_stdout, STDOUT_FILENO);
+            close(original_stdout);
+        }
+        if (redirecting_err && original_stderr != -1) {
+            dup2(original_stderr, STDERR_FILENO);
+            close(original_stderr);
+        }
+    }
+};
+
+void run_external(vector<string>& args, bool redirect_out, const string& outfile, bool append, bool redirect_err, const string& errfile, bool err_append) {
+#ifdef _WIN32
+    string command_line;
+    for(const auto& arg : args) command_line += arg + " ";
+    
+    // Simple execution for Windows
+    intptr_t ret = _spawnvp(_P_WAIT, args[0].c_str(), to_char_array(args).data());
+#else
+    pid_t pid = fork();
+    if (pid == 0) {
+        // Child
+        StdoutRedirect r(redirect_out, outfile, append, redirect_err, errfile, err_append);
+        vector<char*> c_args = to_char_array(args); // Create a non-const copy for execvp
+        execvp(c_args[0], c_args.data());
+        cout << c_args[0] << ": command not found" << endl;
+        exit(1);
+    } else if (pid > 0) {
+        int status;
+        waitpid(pid, &status, 0);
+    } else {
+        perror("fork");
+    }
+#endif
+}
+
 #ifndef _WIN32
-    #include "utils/command_generator.hpp"
-    #include "utils/command_completion.hpp"
+char* command_generator(const char* text, int state) {
+    static int list_index, len;
+    static vector<string> path_dirs;
+    static size_t path_index;
+    static DIR* dir_handle;
+    static string current_dir;
+    const char* name;
+
+    // First call: initialize
+    if (!state) {
+        list_index = 0;
+        len = strlen(text);
+        path_index = 0;
+        dir_handle = nullptr;
+        current_dir.clear();
+        
+        // Get PATH directories
+        path_dirs.clear();
+        char* path_env = getenv("PATH");
+        if (path_env) {
+            path_dirs = split_path(path_env);
+        }
+    }
+
+    // First, check builtin commands
+    while ((name = builtin_command[list_index])) {
+        list_index++;
+        if (strncmp(name, text, len) == 0) {
+            return strdup(name);
+        }
+    }
+
+    // Then search through PATH directories for executables
+    while (path_index < path_dirs.size()) {
+        // Open the next directory if needed
+        if (dir_handle == nullptr) {
+            current_dir = path_dirs[path_index];
+            path_index++;
+            
+            // Skip non-existent directories
+            dir_handle = opendir(current_dir.c_str());
+            if (dir_handle == nullptr) {
+                continue;
+            }
+        }
+
+        // Read entries from current directory
+        struct dirent* entry;
+        while ((entry = readdir(dir_handle)) != nullptr) {
+            // Skip hidden files and directories
+            if (entry->d_name[0] == '.') {
+                continue;
+            }
+
+            // Check if name matches prefix
+            if (strncmp(entry->d_name, text, len) == 0) {
+                // Check if file is executable
+                string full_path = current_dir + "/" + entry->d_name;
+                if (is_executable(full_path)) {
+                    // Return this match (keep dir_handle open for next call)
+                    return strdup(entry->d_name);
+                }
+            }
+        }
+
+        // Finished with this directory
+        closedir(dir_handle);
+        dir_handle = nullptr;
+    }
+
+    return nullptr;
+}
+
+char** command_completion(const char* text, int start, int end){
+    rl_attempted_completion_over = 1; 
+    
+    if(start == 0){
+        return rl_completion_matches(text, command_generator);
+    }
+    
+    return nullptr;
+}
 #endif
 
-using namespace std;
+// ... (omitted)
 
 int main()
 {
@@ -95,6 +326,31 @@ int main()
           
         if (!args.empty() && args[0] == "history") {
             // Print history with proper formatting
+
+            if(args.size() > 1 && args[1]=="-r"){
+              const string history_file= args[2];
+
+              if(filesystem::exists(history_file)){
+                ifstream file(history_file);
+                string line;
+
+                while(getline(file,line)){
+                    if(!line.empty()){
+                        history.push_back(line);
+
+            #ifndef _WIN32
+                      add_history(line.c_str());
+            #endif
+                    }
+                }
+                file.close();
+              }else{
+                cout<<"history: "<<history_file<<": No such file or directory\n";
+              }
+              continue;
+            }
+
+
   
             if(args.size() > 1 && isNumeric(args[1])){
                 int n = stoi(args[1]);
@@ -106,6 +362,7 @@ int main()
                 cout << flush;
                 continue;
             }
+
       
             for(size_t i = 0; i < history.size(); i++) {
                 // Format: 4 spaces, 4-digit right-aligned index, 2 spaces, command
@@ -390,7 +647,9 @@ int main()
 
         
         if(found){
+          
             history.push_back(input);
+
         }else{
             string his="invalid command";
             history.push_back(his);
