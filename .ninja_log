@@ -1,0 +1,13 @@
+# ninja log v7
+13	98	7901718477679775	CMakeFiles/shell.dir/src/utils/builtins.cpp.obj	36ab22fe6f67b350
+21	103	7901718477770250	CMakeFiles/shell.dir/src/utils/command_generator.cpp.obj	8ae7ca0672ce54ca
+17	113	7901718477724117	CMakeFiles/shell.dir/src/utils/command_completion.cpp.obj	6ebc5064ce4f55cb
+26	1701	7901718477817994	CMakeFiles/shell.dir/src/utils/isNumeric.cpp.obj	17cfe7bb49093230
+67	1781	7901718478245631	CMakeFiles/shell.dir/src/utils/to_char_array.cpp.obj	f04cc4937a400a5c
+44	1826	7901718477996115	CMakeFiles/shell.dir/src/utils/split_args.cpp.obj	f50573c356ef4c38
+8	3267	7901718477631411	CMakeFiles/shell.dir/src/utils/StdoutRedirect.cpp.obj	55af1f4a1da6493b
+51	3429	7901718478075811	CMakeFiles/shell.dir/src/utils/split_path.cpp.obj	ddd04c18ce77cbf4
+33	7677	7901718477891650	CMakeFiles/shell.dir/src/utils/is_executable.cpp.obj	c12fd6bdaddf1544
+38	8182	7901718477941404	CMakeFiles/shell.dir/src/utils/run_external.cpp.obj	ef42d5ca52c647a6
+3	9113	7901718477577052	CMakeFiles/shell.dir/src/main.cpp.obj	2eb40f675eada85e
+9113	9285	7901718568681676	shell.exe	2d32a2f010a18f8d

@@ -6,7 +6,8 @@
 #include <sys/stat.h>
 #ifdef _WIN32
     #include <windows.h>
-    // Windows-specific code
+    #include <process.h>
+    #define pid_t intptr_t
 #else
     #include <sys/wait.h>
     // POSIX code
@@ -15,21 +16,174 @@
 #include <sstream>
 #include <fstream>
 #include <fcntl.h>
-#include<readline/readline.h>
-#include<readline/history.h>
+#ifndef _WIN32
+    #include <readline/readline.h>
+    #include <readline/history.h>
+#endif
 #include<cstring>
 #include<dirent.h>
 #include <iomanip> 
 
 using namespace std;
 
-bool is_executable(const string &path);
-vector<string> split_path(const string &path);
+const char* builtin_command[] = {"exit", "echo", "type", "pwd", "cd", "history", nullptr};
 
+bool isNumeric(const string& str) {
+    if (str.empty()) return false;
+    for (char c : str) {
+        if (!isdigit(c)) return false;
+    }
+    return true;
+}
 
-const char* builtin_command[]={"echo","exit","history",nullptr};
+vector<string> split_path(const string& env) {
+    vector<string> paths;
+    stringstream ss(env);
+    string item;
+#ifdef _WIN32
+    char delimiter = ';';
+#else
+    char delimiter = ':';
+#endif
+    while (getline(ss, item, delimiter)) {
+        if (!item.empty()) {
+            paths.push_back(item);
+        }
+    }
+    return paths;
+}
 
+bool is_executable(const string& path) {
+#ifdef _WIN32
+    DWORD attrs = GetFileAttributesA(path.c_str());
+    return (attrs != INVALID_FILE_ATTRIBUTES);
+#else
+    return access(path.c_str(), X_OK) == 0;
+#endif
+}
 
+vector<string> split_args(const string& input) {
+    vector<string> args;
+    string current;
+    bool in_quotes = false;
+    char quote_char = 0;
+    
+    for (size_t i = 0; i < input.length(); i++) {
+        char c = input[i];
+        if (c == '\\' && i + 1 < input.length() && !in_quotes) { // Handle escaped characters outside quotes
+            current += input[++i];
+        } 
+        else if ((c == '\'' || c == '"')) {
+            if (!in_quotes) {
+                in_quotes = true;
+                quote_char = c;
+            } else if (c == quote_char) {
+                if (i + 1 < input.length() && (input[i+1] == '\'' || input[i+1] == '"')) {
+                    // quote concatenation like "foo""bar" -> foobar
+                } else {
+                    in_quotes = false;
+                }
+            } else {
+                current += c;
+            }
+        } else if (c == ' ' && !in_quotes) {
+            if (!current.empty()) {
+                args.push_back(current);
+                current.clear();
+            }
+        } else {
+             if (in_quotes && c == '\\' && (i+1 < input.length()) && (input[i+1] == quote_char || input[i+1] == '\\')) {
+                current += input[++i];
+             } else {
+                current += c;
+             }
+        }
+    }
+    if (!current.empty()) args.push_back(current);
+    return args;
+}
+
+vector<char*> to_char_array(const vector<string>& args) {
+    vector<char*> result;
+    for (const auto& s : args) {
+        result.push_back(const_cast<char*>(s.c_str()));
+    }
+    result.push_back(nullptr);
+    return result;
+}
+
+class StdoutRedirect {
+    int original_stdout;
+    int original_stderr;
+    bool redirecting_out;
+    bool redirecting_err;
+
+public:
+    StdoutRedirect(bool redirect_out, const string& outfile, bool append, 
+                   bool redirect_err = false, const string& errfile = "", bool err_append = false) 
+        : original_stdout(-1), original_stderr(-1), redirecting_out(false), redirecting_err(false) {
+        
+        if (redirect_out) {
+            original_stdout = dup(STDOUT_FILENO);
+            int flags = O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC);
+            int fd = open(outfile.c_str(), flags, 0644);
+            if (fd >= 0) {
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
+                redirecting_out = true;
+            }
+        }
+
+        if (redirect_err) {
+            original_stderr = dup(STDERR_FILENO);
+            int flags = O_WRONLY | O_CREAT | (err_append ? O_APPEND : O_TRUNC);
+            int fd = open(errfile.c_str(), flags, 0644);
+            if (fd >= 0) {
+                dup2(fd, STDERR_FILENO);
+                close(fd);
+                redirecting_err = true;
+            }
+        }
+    }
+
+    ~StdoutRedirect() {
+        if (redirecting_out && original_stdout != -1) {
+            dup2(original_stdout, STDOUT_FILENO);
+            close(original_stdout);
+        }
+        if (redirecting_err && original_stderr != -1) {
+            dup2(original_stderr, STDERR_FILENO);
+            close(original_stderr);
+        }
+    }
+};
+
+void run_external(vector<string>& args, bool redirect_out, const string& outfile, bool append, bool redirect_err, const string& errfile, bool err_append) {
+#ifdef _WIN32
+    string command_line;
+    for(const auto& arg : args) command_line += arg + " ";
+    
+    // Simple execution for Windows
+    intptr_t ret = _spawnvp(_P_WAIT, args[0].c_str(), to_char_array(args).data());
+#else
+    pid_t pid = fork();
+    if (pid == 0) {
+        // Child
+        StdoutRedirect r(redirect_out, outfile, append, redirect_err, errfile, err_append);
+        vector<char*> c_args = to_char_array(args); // Create a non-const copy for execvp
+        execvp(c_args[0], c_args.data());
+        cout << c_args[0] << ": command not found" << endl;
+        exit(1);
+    } else if (pid > 0) {
+        int status;
+        waitpid(pid, &status, 0);
+    } else {
+        perror("fork");
+    }
+#endif
+}
+
+#ifndef _WIN32
 char* command_generator(const char* text, int state) {
     static int list_index, len;
     static vector<string> path_dirs;
@@ -103,301 +257,57 @@ char* command_generator(const char* text, int state) {
     return nullptr;
 }
 
-
 char** command_completion(const char* text, int start, int end){
-    rl_attempted_completion_over = 1;  // Fixed: "rl" not "r1"
+    rl_attempted_completion_over = 1; 
     
     if(start == 0){
-        return rl_completion_matches(text, command_generator);  // Fixed: correct function
+        return rl_completion_matches(text, command_generator);
     }
     
     return nullptr;
 }
+#endif
 
-
-
-bool is_executable(const string &path)
-{
-    return access(path.c_str(), X_OK) == 0;
-}
-
-vector<string> split_path(const string &path)
-{
-    vector<string> dirs;
-    stringstream ss(path);
-    string item;
-    while (getline(ss, item, ':'))
-    {
-        dirs.push_back(item);
-    }
-    return dirs;
-}
-
-vector<string> split_args(const string &input)
-{
-    vector<string> args;
-    string current;
-    bool in_single_quote = false;
-    bool in_double_quote = false;
-
-    for (size_t i = 0; i < input.size(); i++)
-    {
-        char c = input[i];
-        // NEW: tokenize stdout redirection operators when not inside quotes. [web:60]
-        if (!in_single_quote && !in_double_quote)
-        {
-              //1>>
-            if (c == '1' && i + 2 < input.size() && input[i + 1] == '>' && input[i + 2] == '>')
-            {
-                if (!current.empty())
-                {
-                    args.push_back(current);
-                    current.clear();
-                }
-                args.push_back("1>>");
-                i += 2;
-                continue;
-            }
-
-            // 2>>
-              if (c == '2' && i + 2 < input.size() &&
-        input[i + 1] == '>' && input[i + 2] == '>') {
-
-        if (!current.empty()) {
-            args.push_back(current);
-            current.clear();
-        }
-        args.push_back("2>>");
-        i += 2;
-        continue;
-    }
-
-            if (c == '>' && i + 1 < input.size() && input[i + 1] == '>')
-            {
-                if (!current.empty())
-                {
-                    args.push_back(current);
-                    current.clear();
-                }
-                args.push_back(">>");
-                i++;
-                continue;
-            }
-
-            if (c == '1' && i + 1 < input.size() && input[i + 1] == '>')
-            {
-                if (!current.empty())
-                {
-                    args.push_back(current);
-                    current.clear();
-                }
-                args.push_back("1>");
-                i++; // consume '>'
-                continue;
-            }
-            if (c == '2' && i + 1 < input.size() && input[i + 1] == '>')
-            {
-                if (!current.empty())
-                {
-                    args.push_back(current);
-                    current.clear();
-                }
-                args.push_back("2>");
-                i++;
-                continue;
-            }
-            if (c == '>')
-            {
-                if (!current.empty())
-                {
-                    args.push_back(current);
-                    current.clear();
-                }
-                args.push_back(">");
-                continue;
-            }
-        }
-
-        /* Backslash handling (kept) */
-        if (c == '\\')
-        {
-            if (!in_single_quote && !in_double_quote)
-            {
-                if (i + 1 < input.size())
-                {
-                    current += input[i + 1];
-                    i++;
-                }
-                continue;
-            }
-
-            if (in_double_quote)
-            {
-                if (i + 1 < input.size())
-                {
-                    char next = input[i + 1];
-                    if (next == '"' || next == '\\')
-                    {
-                        current += next;
-                        i++;
-                    }
-                    else
-                    {
-                        current += '\\';
-                    }
-                }
-                continue;
-            }
-
-            current += '\\';
-            continue;
-        }
-
-        if (c == '\'' && !in_double_quote)
-        {
-            in_single_quote = !in_single_quote;
-            continue;
-        }
-
-        if (c == '"' && !in_single_quote)
-        {
-            in_double_quote = !in_double_quote;
-            continue;
-        }
-
-        if ((c == ' ' || c == '\t') && !in_single_quote && !in_double_quote)
-        {
-            if (!current.empty())
-            {
-                args.push_back(current);
-                current.clear();
-            }
-        }
-        else
-        {
-            current += c;
-        }
-    }
-
-    if (!current.empty())
-        args.push_back(current);
-    return args;
-}
-
-vector<char *> to_char_array(vector<string> &args)
-{
-    vector<char *> result;
-    for (auto &arg : args)
-        result.push_back(const_cast<char *>(arg.c_str()));
-    result.push_back(nullptr);
-    return result;
-}
-
-// Needed so echo (builtin) can redirect stdout in the shell process. [web:21]
-struct StdoutRedirect
-{
-    int saved = -1;
-    bool active = false;
-
-    StdoutRedirect(bool enable, const string &outfile, bool append)
-    {
-        if (!enable)
-            return;
-
-        saved = dup(STDOUT_FILENO);
-        if (saved < 0)
-        {
-            perror("dup");
-            return;
-        }
-
-        int fd = open(outfile.c_str(), O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC), 0644);
-        if (fd < 0)
-        {
-            perror("open");
-            close(saved);
-            saved = -1;
-            return;
-        }
-
-        if (dup2(fd, STDOUT_FILENO) < 0)
-        {
-            perror("dup2");
-            close(fd);
-            close(saved);
-            saved = -1;
-            return;
-        }
-        close(fd);
-        active = true;
-    }
-
-    ~StdoutRedirect()
-    {
-        if (!active)
-            return;
-        dup2(saved, STDOUT_FILENO);
-        close(saved);
-    }
-};
-
-// External redirection: open + dup2 before execvp in child. [web:22]
-void run_external(vector<string> &args, bool redirect_out, const string &outfile, bool append, bool redirect_err, const string &errfile,bool err_append)
-{
-
-    pid_t pid = fork();
-    if (pid == 0)
-    {
-        if (redirect_out)
-        {
-            int flags = O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC);
-            int fd = open(outfile.c_str(), flags, 0644);
-            if (fd < 0)
-                _exit(1);
-            dup2(fd, STDOUT_FILENO);
-            close(fd);
-        }
-        if (redirect_err)
-        {
-              int flags = O_WRONLY | O_CREAT | (err_append ? O_APPEND : O_TRUNC);
-    int fd = open(errfile.c_str(), flags, 0644);
-    if (fd < 0) _exit(1);
-    dup2(fd, STDERR_FILENO);
-    close(fd);
-        }
-
-        vector<char *> c_args = to_char_array(args);
-        execvp(c_args[0], c_args.data());
-        cerr << args[0] << ": command not found\n";
-        _exit(127);
-    }
-    else if (pid > 0)
-    {
-        waitpid(pid, nullptr, 0);
-    }
-    else
-    {
-        perror("fork");
-    }
-}
+// ... (omitted)
 
 int main()
 {
     cout << unitbuf;
     cerr << unitbuf;
+    
+#ifndef _WIN32
     rl_attempted_completion_function = command_completion;
+#endif
 
-     char* input_buffer;
+     string input;
      vector<string>history;
 
-    while ((input_buffer=readline("$ "))!=nullptr)
+    while (true)
     {
-        string input(input_buffer);
+#ifdef _WIN32
+        cout << "$ ";
+        if (!getline(cin, input)) {
+            break;
+        }
+        if (!input.empty()) {
+            history.push_back(input);
+        }
+#else
+        char* input_buffer = readline("$ ");
+        if (!input_buffer) {
+            break;
+        }
+        input = string(input_buffer);
         free(input_buffer);
+        if (!input.empty()) {
+            add_history(input.c_str());
+            history.push_back(input);
+        }
+#endif
 
-          // Read input
-              history.push_back(input);
-    
+        if (input.empty())
+            continue;
+// ...
               
 
         if (input.empty())
@@ -411,11 +321,66 @@ int main()
         bool append = false;
         bool err_append=false;
         bool has_pipe=false;
-        size_t pipe_index=0;
+        size_t pipe_index=0; // Keeping variable even if unused for now
 
           
         if (!args.empty() && args[0] == "history") {
             // Print history with proper formatting
+
+            if(args.size() > 1 && args[1]=="-r"){
+              const string history_file= args[2];
+
+              if(filesystem::exists(history_file)){
+                ifstream file(history_file);
+                string line;
+
+                while(getline(file,line)){
+                    if(!line.empty()){
+                        history.push_back(line);
+
+            #ifndef _WIN32
+                      add_history(line.c_str());
+            #endif
+                    }
+                }
+                file.close();
+              }else{
+                cout<<"history: "<<history_file<<": No such file or directory\n";
+              }
+              continue;
+            }
+            if(args.size() > 1 && args[1]=="-w"){
+                const string history_file = args[2];
+
+    ofstream file(history_file); // create / overwrite
+
+    if (!file.is_open()) {
+        cout << "history: cannot write to file\n";
+        continue;
+    }
+
+    for (const string& cmd : history) {
+        file << cmd << '\n';
+    }
+
+    file.close();
+    continue;
+            }
+
+
+  
+            if(args.size() > 1 && isNumeric(args[1])){
+                int n = stoi(args[1]);
+                int start_idx = (int)history.size() - n;
+                if (start_idx < 0) start_idx = 0;
+                for(size_t i=(size_t)start_idx; i<history.size(); i++){
+                    cout << "    " << setw(4) << right << (i + 1) << "  " << history[i] << endl;
+                }
+                cout << flush;
+                continue;
+            }
+
+      
             for(size_t i = 0; i < history.size(); i++) {
                 // Format: 4 spaces, 4-digit right-aligned index, 2 spaces, command
                 cout << "    " << setw(4) << right << (i + 1) << "  " << history[i] << endl;
@@ -478,6 +443,7 @@ int main()
 
 
 
+#ifndef _WIN32
    if(has_pipe) {
     // Split command into stages
     vector<vector<string>> commands;
@@ -597,6 +563,12 @@ int main()
     continue;
 
    }
+#else
+    if(has_pipe) {
+        cout << "Pipes not supported on Windows yet\n";
+        continue;
+    }
+#endif
 
         if (args.empty())
             continue;
@@ -693,6 +665,7 @@ int main()
         
         if(found){
             history.push_back(input);
+            
         }else{
             string his="invalid command";
             history.push_back(his);
