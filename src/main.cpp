@@ -350,17 +350,22 @@ int main()
               continue;
             }
             if(args.size() > 1 && args[1]=="-w"){
-              const string history_file= args[2];
+                const string history_file = args[2];
 
-             ofstream file(history_file);
-             vector<string> history;
+    ofstream file(history_file); // create / overwrite
 
-             for(const string& cmd: history){
-                file<<cmd<<"\n";
-             }
-            file << '\n'; 
-             file.close();
-              continue;
+    if (!file.is_open()) {
+        cout << "history: cannot write to file\n";
+        continue;
+    }
+
+    for (const string& cmd : history) {
+        file << cmd << '\n';
+    }
+
+    file << '\n'; // REQUIRED trailing empty line
+    file.close();
+    continue;
             }
 
 
