@@ -349,6 +349,27 @@ int main()
               }
               continue;
             }
+            if(args.size() > 1 && args[1]=="-w"){
+              const string history_file= args[2];
+
+              if(filesystem::exists(history_file)){
+                ofstream file(history_file);
+                vector<string>historyStore;
+                
+            for(size_t i = 0; i < history.size(); i++) {
+               historyStore.push_back(history[i]);
+            }
+
+            for(size_t i=0;i<historyStore.size();i++){
+               file<<input<<endl;
+            }  
+            
+            file.close();
+              }else{
+                cout<<"history: "<<history_file<<": No such file or directory\n";
+              }
+              continue;
+            }
 
 
   
@@ -647,9 +668,8 @@ int main()
 
         
         if(found){
-          
             history.push_back(input);
-
+            
         }else{
             string his="invalid command";
             history.push_back(his);
