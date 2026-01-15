@@ -363,7 +363,6 @@ int main()
         file << cmd << '\n';
     }
 
-    file << '\n'; // REQUIRED trailing empty line
     file.close();
     continue;
             }
