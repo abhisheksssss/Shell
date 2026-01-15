@@ -349,24 +349,37 @@ int main()
               }
               continue;
             }
-            if(args.size() > 1 && args[1]=="-w"){
-                const string history_file = args[2];
+            int savedtillTheIndex=0;
+                if(args.size() > 1 && args[1]=="-w"){
+                    const string history_file = args[2];
+                        ofstream file(history_file); // create / overwrite
+                            if (!file.is_open()) {
+                            cout << "history: cannot write to file\n";
+                            continue;
+                            }
+                            for (const string& cmd : history) {
+                            file << cmd << '\n';
+                            }
+                            savedtillTheIndex=history.size();
+                    file.close();
+                    continue;
+                }
 
-    ofstream file(history_file); // create / overwrite
-
-    if (!file.is_open()) {
-        cout << "history: cannot write to file\n";
-        continue;
-    }
-
-    for (const string& cmd : history) {
-        file << cmd << '\n';
-    }
-
-    file.close();
-    continue;
-            }
-
+                if(args.size()>1 && args[1]=="-a"){
+                    const string history_file=args[2];
+                    ofstream file;
+                    file.open(history_file,ios::app);
+                   if (!file.is_open()) {
+                            cout << "history: cannot write to file\n";
+                            continue;
+                    }
+                 for (int i=savedtillTheIndex-1;i<history.size();i++) {
+                            file << history[i]<< '\n';
+                            }
+                    file.close();
+                continue;
+                    
+                }
 
   
             if(args.size() > 1 && isNumeric(args[1])){
