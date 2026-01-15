@@ -352,22 +352,14 @@ int main()
             if(args.size() > 1 && args[1]=="-w"){
               const string history_file= args[2];
 
-              if(filesystem::exists(history_file)){
-                ofstream file(history_file);
-                vector<string>historyStore;
-                
-            for(size_t i = 0; i < history.size(); i++) {
-               historyStore.push_back(history[i]);
-            }
+             ofstream file(history_file);
+             vector<string> history;
 
-            for(size_t i=0;i<historyStore.size();i++){
-               file<<input<<endl;
-            }  
-            
-            file.close();
-              }else{
-                cout<<"history: "<<history_file<<": No such file or directory\n";
-              }
+             for(const string& cmd: history){
+                file<<cmd<<"\n";
+             }
+            file << '\n'; 
+             file.close();
               continue;
             }
 
