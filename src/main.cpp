@@ -317,6 +317,22 @@ int main()
 
         vector<string> args = split_args(input);
 
+        char* histfile=getenv("HISTFILE");
+        if(histfile && filesystem::exists(histfile)){
+            ifstream file(histfile);
+            string line;
+
+            while(getline(file,line)){
+                if(!line.empty()){
+                    history.push_back(line);
+        #ifdef _WIN32
+                   add_history(line.c_str());
+        #endif
+                }
+            }
+            file.close();
+        }
+
         // Parse and remove > / 1> so execvp doesn't receive them. [web:60]
         bool redirect_out = false;
         bool redirect_err = false;
@@ -367,14 +383,16 @@ int main()
                     continue;
                 }
 
-               if (args.size() > 1 && args[1] == "-a") {
-    const string history_file = args[2];
+                    if (args.size() > 1 && args[1] == "-a") {
+                    const string history_file = args[2];
 
-    ofstream file(history_file, ios::app);
-    if (!file.is_open()) {
-        cout << "history: cannot write to file\n";
-        continue;
-    }
+                    ofstream file(history_file, ios::app);
+                    if (!file.is_open()) {
+                        cout << "history: cannot write to file\n";
+                        continue;
+            }
+
+
 
     // Append only NEW commands
     for (size_t i = savedtillTheIndex; i < history.size(); i++) {
