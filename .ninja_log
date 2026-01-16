@@ -11,3 +11,15 @@
 38	8182	7901718477941404	CMakeFiles/shell.dir/src/utils/run_external.cpp.obj	ef42d5ca52c647a6
 3	9113	7901718477577052	CMakeFiles/shell.dir/src/main.cpp.obj	2eb40f675eada85e
 9113	9285	7901718568681676	shell.exe	2d32a2f010a18f8d
+47	2169	7902488406934554	CMakeFiles/shell.dir/src/utils/StdoutRedirect.cpp.obj	55af1f4a1da6493b
+81	2179	7902488407315872	CMakeFiles/shell.dir/src/utils/isNumeric.cpp.obj	17cfe7bb49093230
+57	2180	7902488406982464	CMakeFiles/shell.dir/src/utils/builtins.cpp.obj	36ab22fe6f67b350
+61	2181	7902488407073885	CMakeFiles/shell.dir/src/utils/command_completion.cpp.obj	6ebc5064ce4f55cb
+71	2182	7902488407180109	CMakeFiles/shell.dir/src/utils/command_generator.cpp.obj	8ae7ca0672ce54ca
+170	2203	7902488408262963	CMakeFiles/shell.dir/src/utils/to_char_array.cpp.obj	f04cc4937a400a5c
+136	2238	7902488407916400	CMakeFiles/shell.dir/src/utils/split_args.cpp.obj	f50573c356ef4c38
+157	2429	7902488408066824	CMakeFiles/shell.dir/src/utils/split_path.cpp.obj	ddd04c18ce77cbf4
+94	2587	7902488407426465	CMakeFiles/shell.dir/src/utils/is_executable.cpp.obj	c12fd6bdaddf1544
+107	3135	7902488407729291	CMakeFiles/shell.dir/src/utils/run_external.cpp.obj	ef42d5ca52c647a6
+41	2791	7902488754828120	CMakeFiles/shell.dir/src/main.cpp.obj	2eb40f675eada85e
+2792	3641	7902488782336893	shell.exe	2d32a2f010a18f8d
