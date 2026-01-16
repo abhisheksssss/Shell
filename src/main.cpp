@@ -297,22 +297,7 @@ int main()
             }
             file.close();
         }
-        if(histfile && filesystem::exists(histfile)){
-            ofstream file(histfile);
-
-
-        if (!file.is_open()) {
-                cout << "history: cannot write to file\n";
-                continue;
-                }
-            if(history.size()>0){
-                for(int i=0;i<history.size();i++){
-                    file<<history[i]<<endl;
-                }
-            }
-            
-            file.close();
-        }
+       
     
         
  
@@ -358,6 +343,10 @@ int main()
         bool err_append=false;
         bool has_pipe=false;
         size_t pipe_index=0; // Keeping variable even if unused for now
+
+
+   
+
 
           
         if (!args.empty() && args[0] == "history") {
@@ -631,8 +620,20 @@ int main()
             continue;
 
         /* exit builtin */
-        if (args[0] == "exit")
-            return 0;
+        if (args[0] == "exit"){
+          char* histfile=getenv("HISTFILE");
+          if(histfile){
+            ofstream file(histfile);
+            if(file.is_open()){
+              for(const string& cmd:history){
+                file<<cmd<<'\n';
+              }
+              file<<'\n';
+              file.close();
+            }
+          }
+          return 0;
+        }
 
         /* echo builtin (ONLY this echo; remove input.rfind echo) */
         if (args[0] == "echo")
