@@ -254,10 +254,6 @@ int main()
         }
 
 
-
-
-
-
 #ifndef _WIN32
    if(has_pipe) {
     // Split command into stages

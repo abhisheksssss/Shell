@@ -1,34 +1,64 @@
-[![progress-banner](https://backend.codecrafters.io/progress/shell/2c09794f-ef81-43e9-b62f-dbbf1b5f348d)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
+# Shell Implementation in C++
 
-This is a starting point for C++ solutions to the
-["Build Your Own Shell" Challenge](https://app.codecrafters.io/courses/shell/overview).
+This project is a custom shell implementation written in C++. It parses and interprets commands, handles built-in functionality, and executes external programs.
 
-In this challenge, you'll build your own POSIX compliant shell that's capable of
-interpreting shell commands, running external programs and builtin commands like
-cd, pwd, echo and more. Along the way, you'll learn about shell command parsing,
-REPLs, builtin commands, and more.
+## Features
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+### Built-in Commands
+- `cd [path]`: Change the current working directory. Supports `~` for the home directory.
+- `pwd`: Print the current working directory.
+- `echo [text]`: Print text to standard output.
+- `exit`: Terminate the shell.
+- `type [command]`: Identify whether a command is a builtin or an external executable.
+- `history`: Display the command history.
 
-# Passing the first stage
+### Core Capabilities
+- **Command Parsing**: Handles arguments with single (`'`) and double (`"`) quotes, including escape characters.
+- **External Execution**: Runs executable programs found in the system `PATH`.
+- **I/O Redirection**:
+    - `>` or `1>`: Redirect standard output (overwrite).
+    - `>>` or `1>>`: Redirect standard output (append).
+    - `2>`: Redirect standard error (overwrite).
+    - `2>>`: Redirect standard error (append).
+- **Cross-Platform**: Support for Windows (using `_spawnvp`) and POSIX (using `fork`/`execvp`).
 
-The entry point for your `shell` implementation is in `src/main.cpp`. Study and
-uncomment the relevant code, and push your changes to pass the first stage:
+## Build Instructions
 
-```sh
-git commit -am "pass 1st stage" # any msg
-git push origin master
-```
+### Prerequisites
+- CMake (version 3.13 or higher)
+- C++ Compiler (supporting C++23 standard) in windows `g++` 
 
-Time to move on to the next stage!
+### Steps
 
-# Stage 2 & beyond
+1.  **Clone the repository**:
+    ```sh
+    git clone https://github.com/abhisheksssss/Shell.git
+    cd Shell
+    ```
 
-Note: This section is for stages 2 and beyond.
+2.  **Configure and Build**:
+    ```sh
+    cmake -S . -B build
+    cmake --build build
+    ```
 
-1. Ensure you have `cmake` installed locally
-1. Run `./your_program.sh` to run your program, which is implemented in
-   `src/main.cpp`.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
+3.  **Run**:
+    - **Windows**: `.\build\shell.exe`
+    - **Linux/Mac**: `./build/shell`
+
+## Project Structure
+
+The project code is organized for modularity:
+
+- `src/main.cpp`: The entry point and main REPL loop.
+- `src/utils/`: Contains helper functions and classes.
+    - `builtins.hpp/cpp`: Definitions of built-in command names.
+    - `isNumeric.hpp/cpp`: Utility to check for numeric strings.
+    - `split_path.hpp/cpp`: Splits the `PATH` environment variable.
+    - `is_executable.hpp/cpp`: Checks if a file is executable.
+    - `split_args.hpp/cpp`: Parses input strings into arguments, handling quotes.
+    - `to_char_array.hpp/cpp`: Converts `std::vector<string>` to `char**` for C APIs.
+    - `StdoutRedirect.hpp/cpp`: RAII class for handling file descriptor redirection.
+    - `run_external.hpp/cpp`: Logic for executing external processes.
+    - `command_generator.hpp/cpp`: (POSIX) Auto-completion logic.
+    - `command_completion.hpp/cpp`: (POSIX) Readline completion hook.
