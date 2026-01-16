@@ -628,7 +628,6 @@ int main()
               for(const string& cmd:history){
                 file<<cmd<<'\n';
               }
-              file<<'\n';
               file.close();
             }
           }
