@@ -282,6 +282,21 @@ int main()
      string input;
      vector<string>history;
     int savedtillTheIndex=0;
+    char* histfile=getenv("HISTFILE");
+        if(histfile && filesystem::exists(histfile)){
+            ifstream file(histfile);
+            string line;
+
+            while(getline(file,line)){
+                if(!line.empty()){
+                    history.push_back(line);
+        #ifdef _WIN32
+                   add_history(line.c_str());
+        #endif
+                }
+            }
+            file.close();
+        }
 
 
     while (true)
@@ -317,21 +332,7 @@ int main()
 
         vector<string> args = split_args(input);
 
-        char* histfile=getenv("HISTFILE");
-        if(histfile && filesystem::exists(histfile)){
-            ifstream file(histfile);
-            string line;
-
-            while(getline(file,line)){
-                if(!line.empty()){
-                    history.push_back(line);
-        #ifdef _WIN32
-                   add_history(line.c_str());
-        #endif
-                }
-            }
-            file.close();
-        }
+        
 
         // Parse and remove > / 1> so execvp doesn't receive them. [web:60]
         bool redirect_out = false;
