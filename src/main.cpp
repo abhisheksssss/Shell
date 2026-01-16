@@ -297,8 +297,25 @@ int main()
             }
             file.close();
         }
+        if(histfile && filesystem::exists(histfile)){
+            ofstream file(histfile);
 
 
+        if (!file.is_open()) {
+                cout << "history: cannot write to file\n";
+                continue;
+                }
+            if(history.size()>0){
+                for(int i=0;i<history.size();i++){
+                    file<<history[i]<<endl;
+                }
+            }
+            
+            file.close();
+        }
+    
+        
+ 
     while (true)
     {
 #ifdef _WIN32
